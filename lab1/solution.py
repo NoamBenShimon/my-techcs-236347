@@ -115,7 +115,7 @@ def beta_reduction(func: Lambda, arg: LambdaExpr)-> LambdaExpr:
 
 def get_bound_names(context: LambdaExpr) -> set[Id]:
     if isinstance(context, Id):
-        return {context}
+        return set()
     elif isinstance(context, Int):
         return set()
     elif isinstance(context, Lambda):
@@ -133,7 +133,7 @@ def get_bound_names(context: LambdaExpr) -> set[Id]:
 
 def is_name_bound(name: Id, context: LambdaExpr) -> bool:
     if isinstance(context, Id):
-        return context.name == name.name
+        return False
     elif isinstance(context, Int):
         return False
     elif isinstance(context, Lambda):
@@ -248,20 +248,24 @@ def normal_order_reduction(e: LambdaExpr) -> LambdaExpr:
 
     if isinstance(e, App):
         if isinstance(e.func, Lambda):
+            print(pretty(beta_reduction(e.func, e.arg)))
             return beta_reduction(e.func, e.arg)
 
         func_reduced = normal_order_reduction(e.func)
 
         # Try to use normal order reduction to reduce e
         if not alpha_equivalent(func_reduced, e.func):
+            print(pretty(App(func_reduced, e.arg)))
             return App(func_reduced, e.arg)
 
         # If reduction fail - go after the arg
         arg_reduced = normal_order_reduction(e.arg)
 
         if not alpha_equivalent(arg_reduced, e.arg):
+            print(pretty(App(e.func, arg_reduced)))
             return App(e.func, arg_reduced)
 
+        print(pretty(e))
         return e
 
     raise NotImplementedError(f"Unsupported expression type: {type(e)}")
