@@ -74,7 +74,7 @@ def beta_reduction(func: Lambda, arg: LambdaExpr)-> LambdaExpr:
 
         elif isinstance(e, Lambda):
             if e.var.name == old.name:
-                return replace(e.body, old, new)
+                return Lambda(e.var, e.body)
 
             if is_name_bound(e.var, context=new):
                 new_var = get_free_name(e, old)
