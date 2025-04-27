@@ -155,7 +155,7 @@ def is_name_free(name: Id, context: LambdaExpr) -> bool:
     return not is_name_bound(name, context)
 
 def get_free_name(*args: LambdaExpr, bound_names: set[Id] = None,
-                  base_name: Id = Id("x"),
+                  base_name: Id = Id("z"),
                   safety_limit: int = 1000) -> Id:
     if bound_names is None:
         bound_names = set()
@@ -225,7 +225,7 @@ def alpha_rename(e: LambdaExpr, old: Id, new: Id) -> LambdaExpr:
 
     if isinstance(e, App):
         return App(alpha_rename(e.func, old, new),
-                   alpha_rename(e.arg, new, old))
+                   alpha_rename(e.arg, old, new))
 
     raise NotImplementedError(f"Unsupported expression type: {type(e)}")
 
@@ -253,12 +253,16 @@ def normal_order_reduction(e: LambdaExpr) -> LambdaExpr:
         func_reduced = normal_order_reduction(e.func)
 
         # Try to use normal order reduction to reduce e
-        if alpha_equivalent(func_reduced, e.func):
-            return func_reduced
+        if not alpha_equivalent(func_reduced, e.func):
+            return App(func_reduced, e.arg)
 
         # If reduction fail - go after the arg
         arg_reduced = normal_order_reduction(e.arg)
-        return App(func_reduced, arg_reduced)
+
+        if not alpha_equivalent(arg_reduced, e.arg):
+            return App(e.func, arg_reduced)
+
+        return e
 
     raise NotImplementedError(f"Unsupported expression type: {type(e)}")
 
