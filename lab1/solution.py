@@ -48,12 +48,13 @@ def interpret(e: LambdaExpr, fuel: int = 100_000) -> LambdaExpr:
 
     if isinstance(e, Id):
         return e
-    elif isinstance(e, App):
-        return interpret(normal_order_reduction(e), fuel - 1)
-    elif isinstance(e, Lambda):
-        return interpret(normal_order_reduction(e), fuel - 1)
-    elif isinstance(e, Let):
-        return interpret(normal_order_reduction(e), fuel - 1)
+    elif isinstance(e, App) or isinstance(e, Lambda) or isinstance(e, Let):
+        reduced: LambdaExpr = normal_order_reduction(e)
+
+        if alpha_equivalent(reduced, e):
+            return reduced
+
+        return interpret(reduced, fuel - 1)
     else:
         return e
 
@@ -228,47 +229,38 @@ def alpha_rename(e: LambdaExpr, old: Id, new: Id) -> LambdaExpr:
 
     raise NotImplementedError(f"Unsupported expression type: {type(e)}")
 
-def replace(e: LambdaExpr, old: Id, new: LambdaExpr) -> LambdaExpr:
+def normal_order_reduction(e: LambdaExpr) -> LambdaExpr:
+    """Perform a single normal-order reduction step."""
     if isinstance(e, Id):
-        if e.name == old.name:
-            return new
         return e
 
     if isinstance(e, Int):
         return e
 
     if isinstance(e, Let):
-        if e.decl.name == old.name: # Problem - does not account for wrap context | wrap is only a problem during renaming inside
-            e_renamed = alpha_rename(e, old, get_free_name(e.decl, old))
-            return Let(replace(e_renamed.decl, old, new), # Will return e_renamed.decl
-                       replace(e_renamed.defn, old, new),
-                       replace(e_renamed.body, old, new))
-
-        return Let(replace(e.decl, old, new), # Will return e.decl
-                   replace(e.defn, old, new),
-                   replace(e.body, old, new))
+        # Transform "let" statmenet to "(\lambda defl. body) defn"
+        e_lambda: Lambda = Lambda(e.decl, e.body)
+        return normal_order_reduction(App(e_lambda, e.defn))
+        # TODO: Review this transformation, check for problems
 
     if isinstance(e, Lambda):
-        return replace(e.body, old, new)
+        return Lambda(e.var, normal_order_reduction(e.body))
 
     if isinstance(e, App):
-        return App(alpha_rename(e.func, old, new),
-                   alpha_rename(e.arg, new, old))
+        if isinstance(e.func, Lambda):
+            return beta_reduction(e.func, e.arg)
+
+        func_reduced = normal_order_reduction(e.func)
+
+        # Try to use normal order reduction to reduce e
+        if alpha_equivalent(func_reduced, e.func):
+            return func_reduced
+
+        # If reduction fail - go after the arg
+        arg_reduced = normal_order_reduction(e.arg)
+        return App(func_reduced, arg_reduced)
 
     raise NotImplementedError(f"Unsupported expression type: {type(e)}")
-
-def normal_order_reduction(e: LambdaExpr) -> LambdaExpr:
-    """Perform a single normal-order reduction step."""
-    if isinstance(e, Id):
-        return e
-    if isinstance(e, Lambda):
-        return Lambda(beta_reduction(e.body, e.))
-    if isinstance(e, App):
-        return beta_reduction(e.body, e.arg)
-    if isinstance(e, Let):
-        
-
-    
 
     # if isinstance(e, App):
     #     # If the function is a lambda abstraction, perform beta reduction
