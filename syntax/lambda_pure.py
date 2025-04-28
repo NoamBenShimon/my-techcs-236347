@@ -12,10 +12,48 @@ type LambdaExpr = Id | Int | Let | Lambda | App
 class Id:
     name: str
 
+    def __eq__(self, other):
+        if isinstance(other, Id):
+            return self.name == other.name
+        if isinstance(other, str):  # allow comparison with string directly
+            return self.name == other
+        return NotImplemented
+
+    # Less than: compare based on the 'value' field
+    def __lt__(self, other):
+        if isinstance(other, Id):
+            return self.name < other.name
+        if isinstance(other, str):  # allow comparison with string directly
+            return self.name < other
+        return NotImplemented
+
+    # Optional: you can define other operators, if necessary
+    def __le__(self, other):
+        if isinstance(other, Id):
+            return self.name <= other.name
+        if isinstance(other, str):  # allow comparison with string directly
+            return self.name <= other
+        return NotImplemented
+
+    def __hash__(self):
+        return hash(self.name)
+
+    def __str__(self):
+        return pretty(self)
+
+    def __repr__(self):
+        return self.__str__()
+
 
 @dataclass(frozen=True, slots=True)
 class Int:
     n: int
+
+    def __str__(self):
+        return pretty(self)
+
+    def __repr__(self):
+        return self.__str__()
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,17 +62,35 @@ class Let:
     defn: LambdaExpr
     body: LambdaExpr
 
+    def __str__(self):
+        return pretty(self)
+
+    def __repr__(self):
+        return self.__str__()
+
 
 @dataclass(frozen=True, slots=True)
 class Lambda:
     var: Id
     body: LambdaExpr
 
+    def __str__(self):
+        return pretty(self)
+
+    def __repr__(self):
+        return self.__str__()
+
 
 @dataclass(frozen=True, slots=True)
 class App:
     func: LambdaExpr
     arg: LambdaExpr
+
+    def __str__(self):
+        return pretty(self)
+
+    def __repr__(self):
+        return self.__str__()
 
 
 @v_args(inline=True)

@@ -1,6 +1,6 @@
 import pytest
 
-from syntax.lambda_pure import parse
+from syntax.lambda_pure import parse, pretty
 
 import solution
 
@@ -22,7 +22,7 @@ import solution
         pytest.param(r"let x = a in (\x. x) b", "b", id="let_lambda_shadowing"),
 
         # Church booleans
-        pytest.param(r"(\p. \q. p q p) (\t. \f. t) (\t. \f. f)", r"\t. \f. t", id="church_and_true_true"),
+        pytest.param(r"(\p. \q. p q p) (\t. \f. t) (\t. \f. t)", r"\t. \f. t", id="church_and_true_true"),
         pytest.param(r"(\p. \q. p q p) (\t. \f. f) (\t. \f. t)", r"\t. \f. f", id="church_and_false_true"),
 
         # Y combinator application (terminating case)
@@ -47,5 +47,7 @@ import solution
 )
 def test_normal_form_advanced(program: str, expected: str) -> None:
     expr = parse(program)
+    print(f"Expected: {expected}")
+    print(f"Program: {pretty(solution.interpret(expr))}")
     assert expr is not None, f"Failed to parse: {program}"
     assert solution.interpret(expr) == parse(expected)
