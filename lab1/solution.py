@@ -60,8 +60,36 @@ def interpret(e: LambdaExpr, fuel: int = 100_000) -> LambdaExpr:
 
 
 def beta_reduction(func: Lambda, arg: LambdaExpr)-> LambdaExpr:
+    """
+    Perform beta-reduction on a lambda expression.
+    Args:
+        func    (Lambda):       The lambda expression to be reduced.
+        arg     (LambdaExpr):   The argument to be applied to the lambda expression.
 
+    Returns:
+        LambdaExpr: The lambda expression after beta-reduction.
+
+    Raises:
+        NotImplementedError: If the expression type is not supported.
+
+    """
     def replace(e: LambdaExpr, old: Id, new: LambdaExpr) -> LambdaExpr:
+        """
+        Replace all occurrences of old with new in the expression e.
+
+        Args:
+            e   (LambdaExpr):   The expression in which to replace.
+            old (Id):           The old name to be replaced.
+            new (LambdaExpr):   The new name to replace the old name.
+
+        Returns:
+            LambdaExpr: The expression after replacement.
+
+        Raises:
+            NotImplementedError: If the expression type is not supported.
+
+        """
+
         if isinstance(e, Id):
             if e.name == old.name:
                 return new
@@ -73,9 +101,11 @@ def beta_reduction(func: Lambda, arg: LambdaExpr)-> LambdaExpr:
             return e
 
         elif isinstance(e, Lambda):
+            # Allow hiding!
             if e.var.name == old.name:
                 return Lambda(e.var, e.body)
 
+            # If the variable is bound in this context, rename it
             if is_name_bound(e.var, context=new):
                 new_var = get_free_name(e, old)
                 e_renamed = alpha_rename(e, e.var, new_var)
@@ -91,11 +121,8 @@ def beta_reduction(func: Lambda, arg: LambdaExpr)-> LambdaExpr:
 
         elif isinstance(e, Let):
             if e.decl.name == old.name:
-                # e_renamed = alpha_rename(e, e.decl, get_free_name(e, old))
-                # return Let(e_renamed.decl,
-                #            replace(e_renamed.defn, old, new),
-                #            replace(e_renamed.body, old, new))
                 raise NotImplementedError("Idk how to handle that")
+                # TODO: Handle this case
 
             if is_name_bound(e.decl, context=new):
                 new_decl = get_free_name(e, old)
@@ -113,7 +140,25 @@ def beta_reduction(func: Lambda, arg: LambdaExpr)-> LambdaExpr:
 
     return replace(func.body, old=func.var, new=arg)
 
+
 def get_bound_names(context: LambdaExpr) -> set[Id]:
+    """
+    Get the names of all bound variables in a lambda expression.
+
+    Args:
+        context (LambdaExpr): Lambda expression to be analyzed.
+
+    Returns:
+        set[Id]: A set of bound variable Id objects.
+
+    Raises:
+        NotImplementedError: If the expression type is not supported.
+
+    Notes:
+        - If context is an Id, it would return an empty set. That is because if it bound, it would be picked off from the Lambda or Let expressions that hold it.
+
+    """
+
     if isinstance(context, Id):
         return set()
     elif isinstance(context, Int):
@@ -132,45 +177,94 @@ def get_bound_names(context: LambdaExpr) -> set[Id]:
         raise NotImplementedError(f"Unsupported expression type: {type(context)}")
 
 def is_name_bound(name: Id, context: LambdaExpr) -> bool:
+    """
+    Check if a name is bound in a given context.
+
+    Args:
+        name    (Id):           The name to check.
+        context (LambdaExpr):   The context in which to check for the name.
+
+    Returns:
+        bool: `True` if the name is bound in the context, `False` otherwise.
+
+    Notes:
+        - Could be implemented using get_bound_names. It would be less efficient, but more readable.
+
+    """
+
     if isinstance(context, Id):
         return False
+
     elif isinstance(context, Int):
         return False
+
     elif isinstance(context, Lambda):
         return (context.var.name == name.name
                 or is_name_bound(name, context.body))
+
     elif isinstance(context, App):
         return (is_name_bound(name, context.func)
                 or is_name_bound(name, context.arg))
+
     elif isinstance(context, Let):
         return (context.decl.name == name.name
                 or is_name_bound(name, context.defn)
                 or is_name_bound(name, context.body))
+
     else:
         raise NotImplementedError(f"Unsupported expression type: {type(context)}")
 
     # return name in get_bound_names(e)
 
 def is_name_free(name: Id, context: LambdaExpr) -> bool:
+    """
+    Check if a name is free in a given context.
+    Args:
+        name    (Id):           The name to check.
+        context (LambdaExpr):   The context in which to check for the name.
+
+    Returns:
+        bool: `True` if the name is free in the context, `False` otherwise.
+
+    Notes:
+        - This function is the opposite of is_name_bound.
+
+    """
     return not is_name_bound(name, context)
 
 def get_free_name(*args: LambdaExpr, bound_names: set[Id] = None,
                   base_name: Id = Id("z"),
                   safety_limit: int = 1000) -> Id:
+    """
+    Get a free name that is not already bound in the given context.
+
+    Args:
+        *args           (LambdaExpr):   Lambda expressions to check for bound names.
+        bound_names     (set[Id]):      A set of bound variable Id objects.
+        base_name       (Id):           The base name to start with.
+        safety_limit    (int):          The maximum number of iterations to prevent infinite loops.
+
+    Returns:
+        Id: A free name that is not already bound in the given context. Possibly the original base_name.
+
+    Raises:
+        RecursionError: If the maximum recursion depth is exceeded.
+
+    """
+
     if bound_names is None:
         bound_names = set()
 
     counter: int = 0
-    is_free: bool = True
 
     while counter < safety_limit:
 
-        if counter == 0:
+        if counter == 0: # TODO: Do not need this, as we already check if the name is free in most cases - use only else
             new_name: Id = Id(f"{base_name.name}")
         else:
             new_name: Id = Id(f"{base_name.name}{counter}")
 
-        is_free = new_name not in bound_names
+        is_free: bool = new_name not in bound_names
 
         if is_free:
             for expr in args:
@@ -178,8 +272,8 @@ def get_free_name(*args: LambdaExpr, bound_names: set[Id] = None,
                     is_free = False
                     break
 
-        if is_free:
-            return new_name
+            if is_free:
+                return new_name
 
         counter += 1
 
@@ -187,9 +281,18 @@ def get_free_name(*args: LambdaExpr, bound_names: set[Id] = None,
 
 def alpha_reduction(e1: LambdaExpr, e2: LambdaExpr) -> LambdaExpr:
     """
-    Would alter e2 so no naming conflicts would occur.
-    e1 would not be altered.
-    The altered version of e2 would be returned.
+    Perform alpha-reduction on the second expression to match the first expression.
+
+    Args:
+        e1 (LambdaExpr):   The first lambda expression.
+        e2 (LambdaExpr):   The second lambda expression to be reduced.
+
+    Returns:
+        LambdaExpr: The second expression after alpha-reduction.
+
+    Raises:
+        NotImplementedError: If the expression type is not supported.
+
     """
     bound_names_1: set = get_bound_names(e1)
     bound_names_2: set = get_bound_names(e2)
@@ -204,8 +307,21 @@ def alpha_reduction(e1: LambdaExpr, e2: LambdaExpr) -> LambdaExpr:
 
 def alpha_rename(e: LambdaExpr, old: Id, new: Id) -> LambdaExpr:
     """
-    Rename a lambda expression according to its name and its bound variables.
+    Perform alpha-renaming on a lambda expression.
+
+    Args:
+        e   (LambdaExpr):   The lambda expression to be renamed.
+        old (Id):           The old name to be replaced.
+        new (Id):           The new name to replace the old name.
+
+    Returns:
+        LambdaExpr: The lambda expression after alpha-renaming.
+
+    Raises:
+        NotImplementedError: If the expression type is not supported.
+
     """
+
     if isinstance(e, Id):
         if e.name == old.name:
             return new
@@ -230,7 +346,20 @@ def alpha_rename(e: LambdaExpr, old: Id, new: Id) -> LambdaExpr:
     raise NotImplementedError(f"Unsupported expression type: {type(e)}")
 
 def normal_order_reduction(e: LambdaExpr) -> LambdaExpr:
-    """Perform a single normal-order reduction step."""
+    """
+    Perform normal-order reduction on a lambda expression.
+
+    Args:
+        e (LambdaExpr):   The lambda expression to be reduced.
+
+    Returns:
+        LambdaExpr: The lambda expression after normal-order reduction.
+
+    Raises:
+        NotImplementedError: If the expression type is not supported.
+
+    """
+
     if isinstance(e, Id):
         return e
 
@@ -287,24 +416,24 @@ def normal_order_reduction(e: LambdaExpr) -> LambdaExpr:
     # else:
     #     raise NotImplementedError(f"Unsupported expression type: {type(e)}")
 
-
 def int_to_church(x: int) -> LambdaExpr:
-    # "\f x. x" = 0
-    # "\f x. f x" = 1
-    # ...
-    # if body:
-    #     return Lambda(Id('f'), Lambda(Id('x'),
-    #                 Lambda('(' + int_to_church(x, False) + ')'))
-    # if x == 0:
-    #     return Lambda(Id('x'), Id('x'))
-    #
-    # return Lambda('f(' + int_to_church(x-1, False) + ')')
-    return parse(int_to_church_string(x))
+    """
+    Convert an integer to its Church numeral representation.
 
-def int_to_church_string(x: int, body: bool = True) -> str:
-    if body:
-        return '\\f. \\n. ' + int_to_church_string(x, False)
-    if x == 0:
-        return "(x)"
+    Args:
+        x (int): The integer to be converted.
 
-    return "f(" + int_to_church_string(x-1, False) + ")"
+    Returns:
+        LambdaExpr: The Church numeral representation of the integer.
+
+    """
+
+    f: Id = Id('f')
+    x: Id = Id('x')
+    body = x
+
+    while x > 0:
+        x -= 1
+        body = App(f, body) # Get the successor - (f body)
+
+    return Lambda(f, Lambda(x, body))  # \\ f. \\ x. (body)
