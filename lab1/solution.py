@@ -93,8 +93,8 @@ def beta_reduction(func: Lambda, arg: LambdaExpr)-> LambdaExpr:
         if isinstance(e, Id):
             if e.name == old.name:
                 return new
-            if is_name_bound(e, context=new):
-                return get_free_name(new, bound_names={old}, base_name=e)
+            # if is_name_bound(e, context=new):
+            #     return get_free_name(new, bound_names={old}, base_name=e)
             return e
 
         elif isinstance(e, Int):
@@ -103,14 +103,15 @@ def beta_reduction(func: Lambda, arg: LambdaExpr)-> LambdaExpr:
         elif isinstance(e, Lambda):
             # Allow hiding!
             if e.var.name == old.name:
-                return Lambda(e.var, e.body)
+                return e
 
             # If the variable is bound in this context, rename it
-            if is_name_bound(e.var, context=new):
-                new_var = get_free_name(e, old)
-                e_renamed = alpha_rename(e, e.var, new_var)
-                return Lambda(e_renamed.var,
-                              replace(e_renamed.body, old, new))
+            bound = get_bound_names(new)
+            if e.var in bound:
+                new_var = get_free_name(e, bound_names=({old} | bound), base_name=e.var)
+                new_body = alpha_rename(e.body, old=e.var, new=new_var)
+                return Lambda(new_var,
+                              replace(new_body, old, new))
 
             return Lambda(e.var,
                           replace(e.body, old, new))
@@ -125,8 +126,9 @@ def beta_reduction(func: Lambda, arg: LambdaExpr)-> LambdaExpr:
                            replace(e.defn, old, new),
                            e.body)
 
-            if is_name_bound(e.decl, context=new):
-                new_decl = get_free_name(e, old)
+            bound = get_bound_names(new)
+            if e.decl in bound:
+                new_decl = get_free_name(e, bound_names=({old} | bound), base_name=e.decl)
                 e_renamed = alpha_rename(e, e.decl, new_decl)
                 return Let(e_renamed.decl,
                            replace(e_renamed.defn, old, new),
@@ -333,9 +335,9 @@ def alpha_rename(e: LambdaExpr, old: Id, new: Id) -> LambdaExpr:
 
     if isinstance(e, Let):
         if e.decl.name == old.name:             # Allow hiding!
-            Let(e.decl,
-                alpha_rename(e.defn, old, new),
-                e.body)
+            return Let(e.decl,
+                       alpha_rename(e.defn, old, new),
+                       e.body)
 
         return Let(e.decl,
                    alpha_rename(e.defn, old, new),
@@ -386,44 +388,23 @@ def normal_order_reduction(e: LambdaExpr) -> LambdaExpr:
 
     if isinstance(e, App):
         if isinstance(e.func, Lambda):
-            print(pretty(beta_reduction(e.func, e.arg)))
             return beta_reduction(e.func, e.arg)
 
         func_reduced = normal_order_reduction(e.func)
 
         # Try to use normal order reduction to reduce e
         if not alpha_equivalent(func_reduced, e.func):
-            print(pretty(App(func_reduced, e.arg)))
             return App(func_reduced, e.arg)
 
         # If reduction fail - go after the arg
         arg_reduced = normal_order_reduction(e.arg)
 
         if not alpha_equivalent(arg_reduced, e.arg):
-            print(pretty(App(e.func, arg_reduced)))
             return App(e.func, arg_reduced)
 
-        print(pretty(e))
         return e
 
     raise NotImplementedError(f"Unsupported expression type: {type(e)}")
-
-    # if isinstance(e, App):
-    #     # If the function is a lambda abstraction, perform beta reduction
-    #     if isinstance(e.func, Lambda):
-    #         return beta_reduction(e.func, e.arg)
-    #     # Otherwise, reduce the function part
-    #     return App(normal_order_reduction(e.func), e.arg)
-    # elif isinstance(e, Lambda):
-    #     # If the body is an application, reduce the body
-    #     return Lambda(e.var, normal_order_reduction(e.body))
-    # elif isinstance(e, Let):
-    #     # Reduce the definition first
-    #     return Let(e.decl, normal_order_reduction(e.defn), e.body)
-    # elif isinstance(e, Id):
-    #     return Id(e.name)
-    # else:
-    #     raise NotImplementedError(f"Unsupported expression type: {type(e)}")
 
 def int_to_church(x: int) -> LambdaExpr:
     """
