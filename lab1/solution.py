@@ -121,8 +121,9 @@ def beta_reduction(func: Lambda, arg: LambdaExpr)-> LambdaExpr:
 
         elif isinstance(e, Let):
             if e.decl.name == old.name:
-                raise NotImplementedError("Idk how to handle that")
-                # TODO: Handle this case
+                return Let(e.decl,
+                           replace(e.defn, old, new),
+                           e.body)
 
             if is_name_bound(e.decl, context=new):
                 new_decl = get_free_name(e, old)
@@ -331,12 +332,20 @@ def alpha_rename(e: LambdaExpr, old: Id, new: Id) -> LambdaExpr:
         return e
 
     if isinstance(e, Let):
-        return Let(alpha_rename(e.decl, old, new),
+        if e.decl.name == old.name:             # Allow hiding!
+            Let(e.decl,
+                alpha_rename(e.defn, old, new),
+                e.body)
+
+        return Let(e.decl,
                    alpha_rename(e.defn, old, new),
                    alpha_rename(e.body, old, new))
 
     if isinstance(e, Lambda):
-        return Lambda(alpha_rename(e.var, old, new),
+        if e.var.name == old.name:              # Allow hiding!
+            return e
+
+        return Lambda(e.var,
                       alpha_rename(e.body, old, new))
 
     if isinstance(e, App):
