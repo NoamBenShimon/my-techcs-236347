@@ -125,16 +125,8 @@ def beta_reduction(func: Lambda, arg: LambdaExpr)-> LambdaExpr:
                            replace(e.defn, old, new),
                            replace(e.body, old, new))
 
-
-
-
-            if is_name_free(e.decl, new):
-                return Let(e.decl,
-                           replace(e.defn, old, new),
-                           replace(e.body, old, new))
-
             new_decl = get_free_name(e.defn, e.body, new, bound_names={old}, base_name=e.decl)
-            new_body = alpha_rename(e.body, e.decl, new_decl)
+            new_body = alpha_rename(e.body, old=e.decl, new=new_decl)
             return Let(new_decl,
                        replace(e.defn, old, new),
                        replace(new_body, old, new))
