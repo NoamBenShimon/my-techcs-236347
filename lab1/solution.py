@@ -429,7 +429,7 @@ def interpret(e: LambdaExpr, fuel: int = 100_000) -> LambdaExpr:
 
     while fuel > 0:
         reduced = normal_order_reduction(result)
-        reduced = eta_reduction(reduced)
+
         if alpha_equivalent(reduced, result):
             return reduced
         result = reduced
