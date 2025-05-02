@@ -204,6 +204,18 @@ The Y-combinator allows for the definition of recursive functions in lambda calc
 - `f` is the function to which the fixed-point combinator is applied.
 """
 
+from functools import lru_cache
+
+@lru_cache(maxsize=1024)
+def get_bound_cached(context):
+    """Cached version of get_bound"""
+    return get_bound(context)
+
+@lru_cache(maxsize=1024)
+def get_free_cached(e):
+    """Cached version of get_free"""
+    return get_free(e)
+
 # Get bound & free variables
 def get_bound(context: LambdaExpr) -> set[Id]:
     """
@@ -549,6 +561,35 @@ def beta_reduction(func: Lambda, arg: LambdaExpr)-> LambdaExpr:
 
     return replace(func.body, old=func.var, new=arg)
 
+def beta_reduction_optimized(func: Lambda, arg: LambdaExpr) -> LambdaExpr:
+    """Optimized beta reduction that avoids unnecessary alpha-conversions"""
+    # Skip alpha-conversion when unnecessary
+    if not any(var in get_free_cached(arg) for var in get_bound_cached(func.body)):
+        return replace_simple(func.body, func.var, arg)
+    return beta_reduction(func, arg)
+
+def replace_simple(e: LambdaExpr, old: Id, new: LambdaExpr) -> LambdaExpr:
+    """A simplified replacement function when variable capture is not a concern"""
+    match e:
+        case Id(_):
+            if e == old:
+                return new
+            return e
+        case Int(_):
+            return e
+        case Lambda(var, body):
+            if var == old:
+                return e
+            return Lambda(var, replace_simple(body, old, new))
+        case App(func, arg):
+            return App(replace_simple(func, old, new), replace_simple(arg, old, new))
+        case Let(decl, defn, body):
+            if decl == old:
+                return Let(decl, replace_simple(defn, old, new), body)
+            return Let(decl, replace_simple(defn, old, new), replace_simple(body, old, new))
+        case _:
+            raise NotImplementedError(f"Unsupported expression type: {type(e)}")
+
 # Eta reductions
 def is_eta_redex(e: LambdaExpr) -> bool:
 
@@ -587,7 +628,123 @@ def eta_reduction(e: LambdaExpr) -> LambdaExpr:
         case _:
             raise NotImplementedError(f"Unsupported expression type: {type(e)}")
 
+
+def is_y_combinator_pattern(expr: App) -> bool:
+    """
+    Check if the expression is a Y combinator application.
+
+    Args:
+        expr (App): The expression to check
+
+    Returns:
+        bool: True if the expression is a Y combinator application
+    """
+    # Check if it's a direct application of Y
+    if alpha_equivalent(expr.func, Y):
+        return True
+
+    # Check if it's an application where the function part is (Y g)
+    if (isinstance(expr.func, App) and
+            alpha_equivalent(expr.func.func, Y)):
+        return True
+
+    return False
+
+
+def optimize_y_combinator_application(expr: App) -> LambdaExpr:
+    """
+    Optimize Y combinator application using the fixed-point property.
+
+    For (Y g), transforms to g (Y g)
+    For ((Y g) x), transforms to (g (Y g)) x
+
+    Args:
+        expr (App): The Y combinator application
+
+    Returns:
+        LambdaExpr: The optimized expression
+    """
+    # Case: (Y g)
+    if alpha_equivalent(expr.func, Y):
+        g = expr.arg
+        # Transform to: g (Y g)
+        return App(g, expr)
+
+    # Case: ((Y g) x)
+    elif isinstance(expr.func, App) and alpha_equivalent(expr.func.func, Y):
+        g = expr.func.arg
+        arg = expr.arg
+        y_g = App(Y, g)
+        # Transform to: (g (Y g)) x
+        return App(App(g, y_g), arg)
+
+    # Should not reach here if is_y_combinator_pattern was checked first
+    return normal_order_reduction(expr)
+
 # Other reductions
+def replace_with_sharing(e, old, new):
+    if e == old:
+        return new
+    if isinstance(e, LambdaExpr):
+        return e  # Reuse unchanged subtrees
+    return replace(e, old, new)
+
+def interpret_lazy(e, fuel=100_000):
+    result = e
+    while fuel > 0:
+        redex = find_next_redex(result)
+        if not redex:
+            return result
+        reduced = reduce_single_redex(result, redex)
+        if alpha_equivalent(reduced, result):
+            return reduced
+        result = reduced
+        fuel -= 1
+    raise RecursionError("Maximum recursion depth exceeded")
+
+
+def normal_order_reduction_optimized(e: LambdaExpr) -> LambdaExpr:
+    """Optimized normal-order reduction with special handling for patterns"""
+    # Y combinator pattern detection (already implemented in your code)
+    if isinstance(e, App) and isinstance(e.func, App) and is_y_combinator_pattern(e):
+        return optimize_y_combinator_application(e)
+
+    match e:
+        case Id(_):
+            return e
+
+        case Int(_):
+            return int_to_church(e.n)
+
+        case Let(decl, defn, body):
+            # Transform let to application and reduce
+            e_lambda = Lambda(decl, body)
+            return normal_order_reduction_optimized(App(e_lambda, defn))
+
+        case Lambda(var, body):
+            reduced_body = normal_order_reduction_optimized(body)
+            if alpha_equivalent(reduced_body, body):
+                return e
+            return Lambda(var, reduced_body)
+
+        case App(func, arg):
+            # Use optimized beta reduction for applications
+            if isinstance(func, Lambda):
+                return beta_reduction_optimized(func, arg)
+
+            func_reduced = normal_order_reduction_optimized(func)
+            if not alpha_equivalent(func_reduced, func):
+                return normal_order_reduction_optimized(App(func_reduced, arg))
+
+            arg_reduced = normal_order_reduction_optimized(arg)
+            if not alpha_equivalent(arg_reduced, arg):
+                return App(func, arg_reduced)
+
+            return e
+
+        case _:
+            raise NotImplementedError(f"Unsupported expression type: {type(e)}")
+
 def normal_order_reduction(e: LambdaExpr) -> LambdaExpr:
     """
     Perform normal-order reduction on a lambda expression.
@@ -656,7 +813,8 @@ def interpret(e: LambdaExpr, fuel: int = 100_000) -> LambdaExpr:
     result = e
 
     while fuel > 0:
-        reduced = normal_order_reduction(result)
+        # reduced = normal_order_reduction(result)
+        reduced = normal_order_reduction_optimized(result)
         if alpha_equivalent(reduced, result):
             return eta_reduction(result)
         result = reduced
