@@ -1,143 +1,7 @@
 from syntax.lambda_pure import *
 from syntax.lambda_pure import Id
 
-
-def alpha_equivalent(e1: LambdaExpr, e2: LambdaExpr) -> bool:
-    """Check if two lambda expressions differ only in the names of their bound variables."""
-    # """Preforming a series of alpha-conversions (renaming)"""
-    if isinstance(e1, Id) and isinstance(e2, Id):
-        return e1 == e2 # Should've been renamed to match
-
-    elif isinstance(e1, Int) and isinstance(e2, Int):
-        return e1.n == e2.n
-
-    elif isinstance(e1, Lambda) and isinstance(e2, Lambda):
-        if e1.var == e2.var:
-            return alpha_equivalent(e1.body, e2.body)
-
-        new_var = get_free_name(e1, e2, base_name=e1.var)
-        e1_renamed = alpha_rename(e1, e1.var, new_var)
-        e2_renamed = alpha_rename(e2, e2.var, new_var)
-
-        return alpha_equivalent(e1_renamed.body, e2_renamed.body)
-
-    elif isinstance(e1, App) and isinstance(e2, App):
-        return (alpha_equivalent(e1.func, e2.func) and
-                alpha_equivalent(e1.arg, e2.arg))
-
-    elif isinstance(e1, Let) and isinstance(e2, Let):
-        if e1.decl == e2.decl:
-            return (alpha_equivalent(e1.defn, e2.defn) and
-                    alpha_equivalent(e1.body, e2.body))
-
-        new_var = get_free_name(e1, e2, base_name=e1.decl)
-        e1_renamed: Let = alpha_rename(e1, e1.decl, new_var)
-        e2_renamed: Let = alpha_rename(e2, e2.decl, new_var)
-
-        return (alpha_equivalent(e1_renamed.defn, e2_renamed.defn) and
-                alpha_equivalent(e1_renamed.body, e2_renamed.body))
-
-    else:
-        return False
-
-
-def interpret(e: LambdaExpr, fuel: int = 100_000) -> LambdaExpr:
-    """Keep performing normal-order reduction steps until you reach normal form, detect divergence or run out of fuel."""
-
-    result = e
-
-    while fuel > 0:
-        reduced = normal_order_reduction(result)
-        if alpha_equivalent(reduced, result):
-            return reduced
-        result = reduced
-        fuel -= 1
-
-    print("Hello: " + pretty(result))
-    raise RecursionError("Maximum recursion depth exceeded")
-
-def beta_reduction(func: Lambda, arg: LambdaExpr)-> LambdaExpr:
-    """
-    Perform beta-reduction on a lambda expression.
-    Args:
-        func    (Lambda):       The lambda expression to be reduced.
-        arg     (LambdaExpr):   The argument to be applied to the lambda expression.
-
-    Returns:
-        LambdaExpr: The lambda expression after beta-reduction.
-
-    Raises:
-        NotImplementedError: If the expression type is not supported.
-
-    """
-    def replace(e: LambdaExpr, old: Id, new: LambdaExpr) -> LambdaExpr:
-        """
-        Replace all occurrences of old with new in the expression e.
-
-        Args:
-            e   (LambdaExpr):   The expression in which to replace.
-            old (Id):           The old name to be replaced.
-            new (LambdaExpr):   The new name to replace the old name.
-
-        Returns:
-            LambdaExpr: The expression after replacement.
-
-        Raises:
-            NotImplementedError: If the expression type is not supported.
-
-        """
-
-        if isinstance(e, Id):
-            if e == old:
-                return new
-            return e
-
-        elif isinstance(e, Int):
-            return e
-
-        elif isinstance(e, Lambda):
-            if e.var == old:              # Allow hiding!
-                return e
-
-            # We need to check if any free variables in 'new' would be captured by e.var
-            # No need to rename if e.var doesn't occur in new (it can't capture anything)
-            if e.var not in get_free(new):
-                return Lambda(e.var,
-                              replace(e.body, old, new))
-
-            # Rename the bound variable to avoid variable capture
-            new_var = get_free_name(e.body, new, bound_names={old}, base_name=e.var)
-            new_body = alpha_rename(e.body, old=e.var, new=new_var)
-            return Lambda(new_var,
-                          replace(new_body, old, new))
-
-        elif isinstance(e, App):
-            return App(replace(e.func, old, new),
-                       replace(e.arg, old, new))
-
-        elif isinstance(e, Let):
-            if e.decl == old:       # Allow hiding!
-                return Let(e.decl,
-                           replace(e.defn, old, new),
-                           e.body)
-
-            if e.decl not in get_free(new):
-                return Let(e.decl,
-                           replace(e.defn, old, new),
-                           replace(e.body, old, new))
-
-            new_decl = get_free_name(e.defn, e.body, new, bound_names={old}, base_name=e.decl)
-            new_body = alpha_rename(e.body, old=e.decl, new=new_decl)
-            return Let(new_decl,
-                       replace(e.defn, old, new),
-                       replace(new_body, old, new))
-
-        else:
-            raise NotImplementedError(f"Unsupported expression type: {type(e)}")
-
-    return replace(func.body, old=func.var, new=arg)
-
-
+# Get bound & free variables
 def get_bound(context: LambdaExpr) -> set[Id]:
     """
     Get all bound variables in a lambda expression.
@@ -293,15 +157,7 @@ def get_free_name(*args: LambdaExpr, bound_names: set[Id] = None,
 
     raise RecursionError(f"Maximum recursion depth {safety_limit} exceeded")
 
-def alpha_reduction(e1: LambdaExpr, e2: LambdaExpr) -> LambdaExpr:
-    shared: set[Id] = get_bound(e1).intersection(get_bound(e2))
-
-    for name in shared:
-        new_name: Id = get_free_name(e1, e2, base_name=name)
-        e2 = alpha_rename(e=e2, old=name, new=new_name)
-
-    return e2
-
+# Alpha reductions
 def alpha_rename(e: LambdaExpr, old: Id, new: Id) -> LambdaExpr:
     """
     Perform alpha-renaming on a lambda expression.
@@ -350,6 +206,172 @@ def alpha_rename(e: LambdaExpr, old: Id, new: Id) -> LambdaExpr:
 
     raise NotImplementedError(f"Unsupported expression type: {type(e)}")
 
+def alpha_reduction(e1: LambdaExpr, e2: LambdaExpr) -> LambdaExpr:
+    shared: set[Id] = get_bound(e1).intersection(get_bound(e2))
+
+    for name in shared:
+        new_name: Id = get_free_name(e1, e2, base_name=name)
+        e2 = alpha_rename(e=e2, old=name, new=new_name)
+
+    return e2
+
+def alpha_equivalent(e1: LambdaExpr, e2: LambdaExpr) -> bool:
+    """Check if two lambda expressions differ only in the names of their bound variables."""
+    # """Preforming a series of alpha-conversions (renaming)"""
+    if isinstance(e1, Id) and isinstance(e2, Id):
+        return e1 == e2 # Should've been renamed to match
+
+    elif isinstance(e1, Int) and isinstance(e2, Int):
+        return e1.n == e2.n
+
+    elif isinstance(e1, Lambda) and isinstance(e2, Lambda):
+        if e1.var == e2.var:
+            return alpha_equivalent(e1.body, e2.body)
+
+        new_var = get_free_name(e1, e2, base_name=e1.var)
+        e1_renamed = alpha_rename(e1, e1.var, new_var)
+        e2_renamed = alpha_rename(e2, e2.var, new_var)
+
+        return alpha_equivalent(e1_renamed.body, e2_renamed.body)
+
+    elif isinstance(e1, App) and isinstance(e2, App):
+        return (alpha_equivalent(e1.func, e2.func) and
+                alpha_equivalent(e1.arg, e2.arg))
+
+    elif isinstance(e1, Let) and isinstance(e2, Let):
+        if e1.decl == e2.decl:
+            return (alpha_equivalent(e1.defn, e2.defn) and
+                    alpha_equivalent(e1.body, e2.body))
+
+        new_var = get_free_name(e1, e2, base_name=e1.decl)
+        e1_renamed: Let = alpha_rename(e1, e1.decl, new_var)
+        e2_renamed: Let = alpha_rename(e2, e2.decl, new_var)
+
+        return (alpha_equivalent(e1_renamed.defn, e2_renamed.defn) and
+                alpha_equivalent(e1_renamed.body, e2_renamed.body))
+
+    else:
+        return False
+
+# Beta reductions
+def beta_reduction(func: Lambda, arg: LambdaExpr)-> LambdaExpr:
+    """
+    Perform beta-reduction on a lambda expression.
+    Args:
+        func    (Lambda):       The lambda expression to be reduced.
+        arg     (LambdaExpr):   The argument to be applied to the lambda expression.
+
+    Returns:
+        LambdaExpr: The lambda expression after beta-reduction.
+
+    Raises:
+        NotImplementedError: If the expression type is not supported.
+
+    """
+    def replace(e: LambdaExpr, old: Id, new: LambdaExpr) -> LambdaExpr:
+        """
+        Replace all occurrences of old with new in the expression e.
+
+        Args:
+            e   (LambdaExpr):   The expression in which to replace.
+            old (Id):           The old name to be replaced.
+            new (LambdaExpr):   The new name to replace the old name.
+
+        Returns:
+            LambdaExpr: The expression after replacement.
+
+        Raises:
+            NotImplementedError: If the expression type is not supported.
+
+        """
+
+        if isinstance(e, Id):
+            if e == old:
+                return new
+            return e
+
+        elif isinstance(e, Int):
+            return e
+
+        elif isinstance(e, Lambda):
+            if e.var == old:              # Allow hiding!
+                return e
+
+            # We need to check if any free variables in 'new' would be captured by e.var
+            # No need to rename if e.var doesn't occur in new (it can't capture anything)
+            if e.var not in get_free(new):
+                return Lambda(e.var,
+                              replace(e.body, old, new))
+
+            # Rename the bound variable to avoid variable capture
+            new_var = get_free_name(e.body, new, bound_names={old}, base_name=e.var)
+            new_body = alpha_rename(e.body, old=e.var, new=new_var)
+            return Lambda(new_var,
+                          replace(new_body, old, new))
+
+        elif isinstance(e, App):
+            return App(replace(e.func, old, new),
+                       replace(e.arg, old, new))
+
+        elif isinstance(e, Let):
+            if e.decl == old:       # Allow hiding!
+                return Let(e.decl,
+                           replace(e.defn, old, new),
+                           e.body)
+
+            if e.decl not in get_free(new):
+                return Let(e.decl,
+                           replace(e.defn, old, new),
+                           replace(e.body, old, new))
+
+            new_decl = get_free_name(e.defn, e.body, new, bound_names={old}, base_name=e.decl)
+            new_body = alpha_rename(e.body, old=e.decl, new=new_decl)
+            return Let(new_decl,
+                       replace(e.defn, old, new),
+                       replace(new_body, old, new))
+
+        else:
+            raise NotImplementedError(f"Unsupported expression type: {type(e)}")
+
+    return replace(func.body, old=func.var, new=arg)
+
+# Eta reductions
+def is_eta_redex(e: LambdaExpr) -> bool:
+
+    return (isinstance(e, Lambda)       and
+            isinstance(e.body, App)     and
+            isinstance(e.body.arg, Id)  and
+            e.body.arg == e.var         and
+            e.var not in get_free(e.body.func))
+
+def eta_reduction(e: LambdaExpr) -> LambdaExpr:
+    if isinstance(e, Id):
+        return e
+
+    if isinstance(e, Int):
+        return e
+
+    if isinstance(e, Lambda):
+        new_body = eta_reduction(e.body)
+
+        if is_eta_redex(Lambda(e.var, new_body)):
+            return new_body.func
+
+        return Lambda(e.var, new_body)
+
+    if isinstance(e, App):
+        return App(eta_reduction(e.func),
+                   eta_reduction(e.arg))
+
+    if isinstance(e, Let):
+        return Let(e.decl,
+                   eta_reduction(e.defn),
+                   eta_reduction(e.body))
+
+    raise NotImplementedError(f"Unsupported expression type: {type(e)}")
+
+
+# Other reductions
 def normal_order_reduction(e: LambdaExpr) -> LambdaExpr:
     """
     Perform normal-order reduction on a lambda expression.
@@ -399,6 +421,22 @@ def normal_order_reduction(e: LambdaExpr) -> LambdaExpr:
         return e
 
     raise NotImplementedError(f"Unsupported expression type: {type(e)}")
+
+def interpret(e: LambdaExpr, fuel: int = 100_000) -> LambdaExpr:
+    """Keep performing normal-order reduction steps until you reach normal form, detect divergence or run out of fuel."""
+
+    result = e
+
+    while fuel > 0:
+        reduced = normal_order_reduction(result)
+
+        if alpha_equivalent(reduced, result):
+            return reduced
+        result = reduced
+        fuel -= 1
+
+    print("Hello: " + pretty(result))
+    raise RecursionError("Maximum recursion depth exceeded")
 
 def int_to_church(n: int) -> LambdaExpr:
 
