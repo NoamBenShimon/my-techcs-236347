@@ -1,6 +1,207 @@
 from syntax.lambda_pure import *
 from syntax.lambda_pure import Id
 
+# Popular lambda-expressions
+TRUE    = Lambda(Id('x'), Lambda(Id('y'), Id('x')))
+"""
+The `TRUE` lambda expression represents the boolean value `True` in lambda calculus.
+It is defined as: `\\x y. x`
+When applied to two arguments, it always returns the first argument.
+"""
+
+FALSE   = Lambda(Id('x'), Lambda(Id('y'), Id('y')))
+"""
+The `FALSE` lambda expression represents the boolean value `False` in lambda calculus.
+It is defined as: `\\x y. y`
+When applied to two arguments, it always returns the second argument.
+"""
+
+IF      = Lambda(Id('b'), Lambda(Id('x'), Lambda(Id('y'), App(App(Id('b'), Id('x')), Id('y')))))
+"""
+The `IF` lambda expression represents a conditional statement in lambda calculus.
+It is defined as: `\\b x y. ((b x) y)`
+
+It takes three arguments:
+1. `b` - A boolean value (TRUE or FALSE).
+2. `x` - The value to return if `b` is TRUE.
+3. `y` - The value to return if `b` is FALSE.
+
+The expression evaluates to `x` if `b` is TRUE, and `y` if `b` is FALSE.
+"""
+
+ISZERO  = Lambda(Id("n"),
+                 App(
+                     App(Id("n"),
+                         Lambda(Id("x"), FALSE)
+                         ),
+                     TRUE
+                 )
+                 )
+"""
+The `ISZERO` lambda expression checks if a given Church numeral is zero.
+
+It is defined as: `\\n. (n (\\x. FALSE) TRUE)`
+
+Explanation:
+- `n` is the Church numeral to check.
+- The Church numeral `n` is applied to the function `\\x. FALSE`.
+- If `n` is zero, it does not apply the function and directly returns `TRUE`.
+- If `n` is greater than zero, it applies the function at least once, resulting in `FALSE`.
+
+Returns:
+- `TRUE` if the Church numeral is zero.
+- `FALSE` otherwise.
+"""
+
+SUCC    = Lambda(Id('n'),
+                 Lambda(Id('f'),
+                        Lambda(Id('x'),
+                               App(Id('f'), App(App(Id('n'), Id('f')), Id('x')))
+                               )
+                        )
+                 )
+"""
+The `SUCC` lambda expression represents the successor function in lambda calculus.
+It is defined as: `\\n f x. (f ((n f) x))`
+
+It takes a Church numeral `n` and returns the Church numeral representing `n + 1`.
+- `f` is the function to apply.
+- `x` is the initial value.
+"""
+
+PRED    = Lambda(Id("n"),
+                 Lambda(Id("f"),
+                        Lambda(Id("x"),
+                               App(
+                                   App(
+                                       App(Id("n"),
+                                           Lambda(Id("g"),
+                                                  Lambda(Id("h"),
+                                                         App(Id("h"), App(Id("g"), Id("f")))
+                                                         )
+                                                  )
+                                           ),
+                                       Lambda(Id("u"), Id("x"))
+                                   ),
+                                   Lambda(Id("u"), Id("u"))
+                               )
+                               )
+                        )
+                 )
+"""
+The `PRED` lambda expression represents the predecessor function in lambda calculus.
+It is defined as: `\\n f x. (n (\\g h. (h (g f))) (\\u. x) (\\u. u))`
+
+Explanation:
+- `n` is the Church numeral whose predecessor is to be computed.
+- `f` is the function to apply.
+- `x` is the initial value.
+- The function works by constructing a pair of values and returning the first value, effectively decrementing the numeral.
+
+Steps:
+1. `n` is applied to the function `\\g h. (h (g f))`, which builds a pair of values.
+2. The second argument `\\u. x` initializes the pair with `x`.
+3. The third argument `\\u. u` ensures the correct structure for the pair.
+
+Returns:
+- The Church numeral representing `n - 1`.
+- If `n` is 0, the result is the Church numeral for 0 (no negative numbers in Church numerals).
+"""
+
+ADD     = Lambda(Id('m'),
+                 Lambda(Id('n'),
+                        Lambda(Id('f'),
+                               Lambda(Id('x'),
+                                      App(App(Id('m'), Id('f')), App(App(Id('n'), Id('f')), Id('x')))
+                                      )
+                               )
+                        )
+                 )
+"""
+The `ADD` lambda expression represents addition of two Church numerals in lambda calculus.
+It is defined as: `\\m n f x. ((m f) ((n f) x))`
+
+It takes two Church numerals `m` and `n` and returns their sum as a Church numeral.
+- `f` is the function to apply.
+- `x` is the initial value.
+"""
+
+SUB     = Lambda(Id("m"),
+                 Lambda(Id("n"),
+                        App(App(Id("n"), PRED), Id("m"))
+                        )
+                 )
+"""
+The `SUB` lambda expression represents subtraction of two Church numerals in lambda calculus.
+It is defined as: `\\m n. ((n PRED) m)`
+
+Explanation:
+- `m` is the minuend (the number from which another number is subtracted).
+- `n` is the subtrahend (the number to subtract).
+- `PRED` is the predecessor function, which decrements a Church numeral by 1.
+
+The expression applies the predecessor function `n` times to `m`, effectively computing `m - n`.
+
+Returns:
+- The Church numeral representing the result of `m - n`.
+- If `n > m`, the result is the Church numeral for 0 (no negative numbers in Church numerals).
+"""
+
+MULT    = Lambda(Id('m'),
+                 Lambda(Id('n'),
+                        Lambda(Id('f'),
+                               App(Id('m'), App(Id('n'), Id('f')))
+                               )
+                        )
+                 )
+"""
+The `MULT` lambda expression represents multiplication of two Church numerals in lambda calculus.
+It is defined as: `\\m n f. (m (n f))`
+
+It takes two Church numerals `m` and `n` and returns their product as a Church numeral.
+- `f` is the function to apply.
+"""
+
+LEQ     = Lambda(Id("m"),
+                 Lambda(Id("n"),
+                        App(
+                            ISZERO,
+                            App(App(SUB, Id("m")), Id("n"))
+                        )
+                        )
+                 )
+"""
+The `LEQ` lambda expression represents the "less than or equal to" comparison for Church numerals in lambda calculus.
+It is defined as: `\\m n. ISZERO ((SUB m) n)`
+
+Explanation:
+- `m` and `n` are Church numerals to compare.
+- `SUB` computes the subtraction `m - n`.
+- `ISZERO` checks if the result of `m - n` is zero.
+
+Returns:
+- `TRUE` if `m` is less than or equal to `n`.
+- `FALSE` otherwise.
+"""
+
+Y       = Lambda(Id('f'),
+                 App(
+                     Lambda(Id('x'),
+                            App(Id('f'), App(Id('x'), Id('x')))
+                            ),
+                     Lambda(Id('x'),
+                            App(Id('f'), App(Id('x'), Id('x')))
+                            )
+                 )
+                 )
+"""
+The `Y` lambda expression represents the Y-combinator (fixed-point combinator) in lambda calculus.
+It is defined as: `\\f. ((\\x. (f (x x))) (\\x. (f (x x))))`
+
+The Y-combinator allows for the definition of recursive functions in lambda calculus.
+- `f` is the function to which the fixed-point combinator is applied.
+"""
+
 # Get bound & free variables
 def get_bound(context: LambdaExpr) -> set[Id]:
     """
@@ -391,7 +592,7 @@ def normal_order_reduction(e: LambdaExpr) -> LambdaExpr:
         return e
 
     if isinstance(e, Int):
-        return e
+        return int_to_church(e.n)
 
     if isinstance(e, Let):
         # Transform "let" statmenet to "(\lambda defl. body) defn"
