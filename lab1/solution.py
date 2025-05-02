@@ -1,3 +1,5 @@
+from unittest import case
+
 from syntax.lambda_pure import *
 from syntax.lambda_pure import Id
 
@@ -463,7 +465,6 @@ def alpha_equivalent(e1: LambdaExpr, e2: LambdaExpr) -> bool:
 
     return False
 
-
 # Beta reductions
 def beta_reduction(func: Lambda, arg: LambdaExpr)-> LambdaExpr:
     """
@@ -496,53 +497,54 @@ def beta_reduction(func: Lambda, arg: LambdaExpr)-> LambdaExpr:
 
         """
 
-        if isinstance(e, Id):
-            if e == old:
-                return new
-            return e
-
-        elif isinstance(e, Int):
-            return e
-
-        elif isinstance(e, Lambda):
-            if e.var == old:              # Allow hiding!
+        match e:
+            case Id(_):
+                if e == old:
+                    return new
                 return e
 
-            # We need to check if any free variables in 'new' would be captured by e.var
-            # No need to rename if e.var doesn't occur in new (it can't capture anything)
-            if e.var not in get_free(new):
-                return Lambda(e.var,
-                              replace(e.body, old, new))
+            case Int(_):
+                return e
 
-            # Rename the bound variable to avoid variable capture
-            new_var = get_free_name(e.body, new, bound_names={old}, base_name=e.var)
-            new_body = alpha_rename(e.body, old=e.var, new=new_var)
-            return Lambda(new_var,
-                          replace(new_body, old, new))
+            case Lambda(var, body):
+                if var == old:
+                    return e
 
-        elif isinstance(e, App):
-            return App(replace(e.func, old, new),
-                       replace(e.arg, old, new))
+                # We need to check if any free variables in 'new' would be captured by e.var
+                # No need to rename if e.var doesn't occur in new (it can't capture anything)
+                if var not in get_free(new):
+                    return Lambda(var,
+                                  replace(body, old, new))
 
-        elif isinstance(e, Let):
-            if e.decl == old:       # Allow hiding!
-                return Let(e.decl,
-                           replace(e.defn, old, new),
-                           e.body)
+                # Rename the bound variable to avoid variable capture
+                new_var = get_free_name(body, new, bound_names={old}, base_name=var)
+                new_body = alpha_rename(body, old=var, new=new_var)
+                return Lambda(new_var,
+                              replace(new_body, old, new))
 
-            if e.decl not in get_free(new):
-                return Let(e.decl,
-                           replace(e.defn, old, new),
-                           replace(e.body, old, new))
+            case App(func, arg):
+                return App(replace(func, old, new),
+                           replace(arg, old, new))
 
-            new_decl = get_free_name(e.defn, e.body, new, bound_names={old}, base_name=e.decl)
-            new_body = alpha_rename(e.body, old=e.decl, new=new_decl)
-            return Let(new_decl,
-                       replace(e.defn, old, new),
-                       replace(new_body, old, new))
+            case Let(decl, defn, body):
+                if decl == old:
+                    return Let(e.decl,
+                               replace(defn, old, new),
+                               body)
 
-        else:
-            raise NotImplementedError(f"Unsupported expression type: {type(e)}")
+                if decl not in get_free(new):
+                    return Let(decl,
+                               replace(defn, old, new),
+                               replace(body, old, new))
+
+                new_decl = get_free_name(body, new, bound_names={decl}, base_name=decl)
+                new_body = alpha_rename(body, old=decl, new=new_decl)
+                return Let(new_decl,
+                           replace(new_body, old, new),
+                           replace(body, decl, new))
+
+            case _:
+                raise NotImplementedError(f"Unsupported expression type: {type(e)}")
 
     return replace(func.body, old=func.var, new=arg)
 
@@ -552,35 +554,38 @@ def is_eta_redex(e: LambdaExpr) -> bool:
     return (isinstance(e, Lambda)       and
             isinstance(e.body, App)     and
             isinstance(e.body.arg, Id)  and
+            not isinstance(e.body.func, Id) and
             e.body.arg == e.var         and
             e.var not in get_free(e.body.func))
 
 def eta_reduction(e: LambdaExpr) -> LambdaExpr:
-    if isinstance(e, Id):
-        return e
 
-    if isinstance(e, Int):
-        return e
+    match e:
+        case Id(_):
+            return e
 
-    if isinstance(e, Lambda):
-        new_body = eta_reduction(e.body)
+        case Int(_):
+            return e
 
-        if is_eta_redex(Lambda(e.var, new_body)):
-            return new_body.func
+        case Lambda(var, body):
+            new_body = alpha_rename(body, old=var, new=var)
 
-        return Lambda(e.var, new_body)
+            if is_eta_redex(Lambda(var, new_body)):
+                return new_body.func
 
-    if isinstance(e, App):
-        return App(eta_reduction(e.func),
-                   eta_reduction(e.arg))
+            return Lambda(var, new_body)
 
-    if isinstance(e, Let):
-        return Let(e.decl,
-                   eta_reduction(e.defn),
-                   eta_reduction(e.body))
+        case App(func, arg):
+            return App(eta_reduction(func),
+                       eta_reduction(arg))
 
-    raise NotImplementedError(f"Unsupported expression type: {type(e)}")
+        case Let(decl, defn, body):
+            return Let(decl,
+                       eta_reduction(defn),
+                       eta_reduction(body))
 
+        case _:
+            raise NotImplementedError(f"Unsupported expression type: {type(e)}")
 
 # Other reductions
 def normal_order_reduction(e: LambdaExpr) -> LambdaExpr:
@@ -640,7 +645,7 @@ def interpret(e: LambdaExpr, fuel: int = 100_000) -> LambdaExpr:
 
     while fuel > 0:
         reduced = normal_order_reduction(result)
-
+        reduced = eta_reduction(reduced)
         if alpha_equivalent(reduced, result):
             return reduced
         result = reduced
