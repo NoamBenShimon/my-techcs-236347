@@ -1,6 +1,6 @@
 import pytest
 
-from syntax.lambda_pure import parse
+from syntax.lambda_pure import parse, pretty
 
 import solution
 
@@ -16,7 +16,7 @@ import solution
         # Complex combinators and compositions
         pytest.param(r"((\x.\y.\z.x z (y z)) (\x.\y.x)) (\x.\y.y)", r"\z. z", id="s_k_i_composition"),
         pytest.param(r"((\x.\y.\z.x z (y z)) (\x.\y.\z.x (y z))) (\x.\y.y) a b", "a b", id="s_s_i_application"),
-        pytest.param(r"((\x.\y.\z.x z (y z)) (\x.\y.\z.x (y z))) (\x.\y.x) a b", "a (a b)", id="s_s_k_application"),
+        pytest.param(r"((\x.\y.\z.x z (y z)) (\x.\y.\z.x (y z))) (\x.\y.x) a b", "a a", id="s_s_k_application"),
 
         # Fixed point combinator with practical applications
         pytest.param(
@@ -76,5 +76,8 @@ import solution
 )
 def test_normal_form_harder(program: str, expected: str) -> None:
     expr = parse(program)
+    print(f"Input: {program}")
+    print(f"Expected: {expected}")
+    print(f"Program: {pretty(solution.interpret(expr))}")
     assert expr is not None, f"Failed to parse: {program}"
     assert solution.interpret(expr) == parse(expected)
