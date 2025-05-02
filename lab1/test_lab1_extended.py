@@ -26,11 +26,11 @@ import solution
         pytest.param(r"(\p. \q. p q p) (\t. \f. f) (\t. \f. t)", r"\t. \f. f", id="church_and_false_true"),
 
         # Y combinator application (terminating case)
-        # pytest.param(
-        #     r"(\f. (\x. f (\y. x x y)) (\x. f (\y. x x y))) (\f. \n. (\c. c (\t. \f. f) (\t. \f. t)) n (\t. \f. t) (f ((\n. \f. \x. n (\g. \h. h (g f)) (\u. x) (\u. u)) n)))",
-        #     r"\n. (\c. c (\t. \f. f) (\t. \f. t)) n (\t. \f. t) ((\f. (\x. f (\y. x x y)) (\x. f (\y. x x y))) (\f. \n. (\c. c (\t. \f. f) (\t. \f. t)) n (\t. \f. t) (f ((\n. \f. \x. n (\g. \h. h (g f)) (\u. x) (\u. u)) n))) ((\n. \f. \x. n (\g. \h. h (g f)) (\u. x) (\u. u)) n))",
-        #     id="y_combinator_factorial"
-        # ),
+        pytest.param(
+            r"(\f. (\x. f (\y. x x y)) (\x. f (\y. x x y))) (\f. \n. (\c. c (\t. \f. f) (\t. \f. t)) n (\t. \f. t) (f ((\n. \f. \x. n (\g. \h. h (g f)) (\u. x) (\u. u)) n)))",
+            r"\n. (\c. c (\t. \f. f) (\t. \f. t)) n (\t. \f. t) ((\f. (\x. f (\y. x x y)) (\x. f (\y. x x y))) (\f. \n. (\c. c (\t. \f. f) (\t. \f. t)) n (\t. \f. t) (f ((\n. \f. \x. n (\g. \h. h (g f)) (\u. x) (\u. u)) n))) ((\n. \f. \x. n (\g. \h. h (g f)) (\u. x) (\u. u)) n))",
+            id="y_combinator_factorial"
+        ),
 
         # Interesting reductions
         pytest.param(r"(\x. (\y. y) x) ((\z. z) a)", "a", id="double_application"),

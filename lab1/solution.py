@@ -603,40 +603,52 @@ def normal_order_reduction(e: LambdaExpr) -> LambdaExpr:
 
     """
 
-    if isinstance(e, Id):
-        return e
+    match e:
+        case Id(_):
+            return e
 
-    if isinstance(e, Int):
-        return int_to_church(e.n)
+        case Int(_):
+            return int_to_church(e.n)
 
-    if isinstance(e, Let):
-        # Transform "let" statmenet to "(\lambda defl. body) defn"
-        e_lambda: Lambda = Lambda(e.decl, e.body)
-        return normal_order_reduction(App(e_lambda, e.defn))
-        # TODO: Review this transformation, check for problems
+        case Let(decl, defn, body):
+            # Transform "let" statement to "(\lambda defl. body) defn"
+            e_lambda: Lambda = Lambda(decl, body)
+            return normal_order_reduction(App(e_lambda, defn))
 
-    if isinstance(e, Lambda):
-        return Lambda(e.var, normal_order_reduction(e.body))
+        case Lambda(var, body):
+            # Check if the body is a redex
+            # if isinstance(body, App):
+            #     if isinstance(body.func, Lambda):
+            #         return beta_reduction(body.func, body.arg)
+            #     else:
+            #         return App(Lambda(var, normal_order_reduction(body)), body.arg)
+            # else:
+            #     return Lambda(var, normal_order_reduction(body))
+            reduced_body = normal_order_reduction(body)
+            if alpha_equivalent(reduced_body, body):
+                return e
+            return Lambda(var, reduced_body)
 
-    if isinstance(e, App):
-        if isinstance(e.func, Lambda):
-            return beta_reduction(e.func, e.arg)
+        case App(func, arg):
+            # Check if the function is a lambda
+            if isinstance(func, Lambda):
+                # Perform beta-reduction
+                return beta_reduction(func, arg)
 
-        func_reduced = normal_order_reduction(e.func)
+            func_reduced = normal_order_reduction(func)
 
-        # Try to use normal order reduction to reduce e
-        if not alpha_equivalent(func_reduced, e.func):
-            return App(func_reduced, e.arg)
+            if not alpha_equivalent(func_reduced, func):
+                return normal_order_reduction(App(func_reduced, arg))
 
-        # If reduction fail - go after the arg
-        arg_reduced = normal_order_reduction(e.arg)
+            arg_reduced = normal_order_reduction(arg)
 
-        if not alpha_equivalent(arg_reduced, e.arg):
-            return App(e.func, arg_reduced)
+            if not alpha_equivalent(arg_reduced, arg):
+                return App(func, arg_reduced)
 
-        return e
+            return e
 
-    raise NotImplementedError(f"Unsupported expression type: {type(e)}")
+        case _:
+            raise NotImplementedError(f"Unsupported expression type: {type(e)}")
 
 def interpret(e: LambdaExpr, fuel: int = 100_000) -> LambdaExpr:
     """Keep performing normal-order reduction steps until you reach normal form, detect divergence or run out of fuel."""
