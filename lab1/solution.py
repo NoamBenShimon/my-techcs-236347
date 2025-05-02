@@ -221,41 +221,44 @@ def get_bound(context: LambdaExpr) -> set[Id]:
 
     """
 
-    if isinstance(context, Id):
-        return set()
-    elif isinstance(context, Int):
-        return set()
-    elif isinstance(context, Lambda):
-        return ({context.var}
-                | get_bound(context.body))
-    elif isinstance(context, App):
-        return (get_bound(context.func)
-                | get_bound(context.arg))
-    elif isinstance(context, Let):
-        return ({context.decl}
-                | get_bound(context.defn)
-                | get_bound(context.body))
-    else:
-        raise NotImplementedError(f"Unsupported expression type: {type(context)}")
+    match context:
+        case Id(_):
+            return set()
+
+        case Int(_):
+            return set()
+
+        case Lambda(var, body):
+            return {var} | get_bound(body)
+
+        case App(func, arg):
+            return get_bound(func) | get_bound(arg)
+
+        case Let(decl, defn, body):
+            return {decl} | get_bound(defn) | get_bound(body)
+
+        case _:
+            raise NotImplementedError(f"Unsupported expression type: {type(context)}")
 
 def get_free(e: LambdaExpr) -> set[Id]:
-    if isinstance(e, Id):
-        return {e}
+    match e:
+        case Id(_):
+            return {e}
 
-    elif isinstance(e, Int):
-        return set()
+        case Int(_):
+            return set()
 
-    elif isinstance(e, Lambda):
-        return get_free(e.body) - {e.var}
+        case Lambda(var, body):
+            return get_free(body) - {var}
 
-    elif isinstance(e, App):
-        return get_free(e.func) | get_free(e.arg)
+        case App(func, arg):
+            return get_free(func) | get_free(arg)
 
-    elif isinstance(e, Let):
-        return get_free(e.defn) | (get_free(e.body) - {e.decl})
+        case Let(decl, defn, body):
+            return get_free(defn) | (get_free(body) - {decl})
 
-    else:
-        raise NotImplementedError(f"Unsupported expression type: {type(e)}")
+        case _:
+            raise NotImplementedError(f"Unsupported expression type: {type(e)}")
 
 def is_name_bound(name: Id, context: LambdaExpr) -> bool:
     """
@@ -273,31 +276,32 @@ def is_name_bound(name: Id, context: LambdaExpr) -> bool:
 
     """
 
-    if isinstance(context, Id):
-        return False
+    match context:
+        case Id(_):
+            return False
 
-    elif isinstance(context, Int):
-        return False
+        case Int(_):
+            return False
 
-    elif isinstance(context, Lambda):
-        return (context.var == name
-                or is_name_bound(name, context.body))
+        case Lambda(var, body):
+            return (var == name
+                    or is_name_bound(name, body))
 
-    elif isinstance(context, App):
-        return (is_name_bound(name, context.func)
-                or is_name_bound(name, context.arg))
+        case App(func, arg):
+            return (is_name_bound(name, func)
+                    or is_name_bound(name, arg))
 
-    elif isinstance(context, Let):
-        return (context.decl == name
-                or is_name_bound(name, context.defn)
-                or is_name_bound(name, context.body))
+        case Let(decl, defn, body):
+            return (decl == name
+                    or is_name_bound(name, defn)
+                    or is_name_bound(name, body))
 
-    else:
-        raise NotImplementedError(f"Unsupported expression type: {type(context)}")
+        case _:
+            raise NotImplementedError(f"Unsupported expression type: {type(context)}")
 
 def is_name_free(name: Id, context: LambdaExpr) -> bool:
     """
-    Check if a name is free in a given context.
+    Check if a name is free var in a given context.
     Args:
         name    (Id):           The name to check.
         context (LambdaExpr):   The context in which to check for the name.
@@ -305,11 +309,8 @@ def is_name_free(name: Id, context: LambdaExpr) -> bool:
     Returns:
         bool: `True` if the name is free in the context, `False` otherwise.
 
-    Notes:
-        - This function is the opposite of is_name_bound.
-
     """
-    return not is_name_bound(name, context)
+    return name in get_free(context)
 
 def get_free_name(*args: LambdaExpr, bound_names: set[Id] = None,
                   base_name: Id = Id("t"),
@@ -376,36 +377,40 @@ def alpha_rename(e: LambdaExpr, old: Id, new: Id) -> LambdaExpr:
 
     """
 
-    if isinstance(e, Id):
-        if e == old:
-            return new
-        return e
-
-    if isinstance(e, Int):
-        return e
-
-    if isinstance(e, Let):
-        if e.decl == old:             # Allow hiding!
-            return Let(e.decl,
-                       alpha_rename(e.defn, old, new),
-                       e.body)
-
-        return Let(e.decl,
-                   alpha_rename(e.defn, old, new),
-                   alpha_rename(e.body, old, new))
-
-    if isinstance(e, Lambda):
-        if e.var == old:              # Allow hiding!
+    match e:
+        case Id(_):
+            if e == old:
+                return new
             return e
 
-        return Lambda(e.var,
-                      alpha_rename(e.body, old, new))
+        case Int(_):
+            return e
 
-    if isinstance(e, App):
-        return App(alpha_rename(e.func, old, new),
-                   alpha_rename(e.arg, old, new))
+        case Let(decl, defn, body):
+            if decl == old:             # Allow hiding!
+                return Let(decl,
+                           alpha_rename(defn, old, new),
+                           body)
 
-    raise NotImplementedError(f"Unsupported expression type: {type(e)}")
+            return Let(decl,
+                       alpha_rename(defn, old, new),
+                       alpha_rename(body, old, new))
+
+        case Lambda(var, body):
+            if var == old:              # Allow hiding!
+                return e
+            if var == new:              # Avoid renaming to the same name
+                return e
+
+            return Lambda(e.var,
+                          alpha_rename(body, old, new))
+
+        case App(func, arg):
+            return App(alpha_rename(func, old, new),
+                       alpha_rename(arg, old, new))
+
+        case _:
+            raise NotImplementedError(f"Unsupported expression type: {type(e)}")
 
 def alpha_reduction(e1: LambdaExpr, e2: LambdaExpr) -> LambdaExpr:
     shared: set[Id] = get_bound(e1).intersection(get_bound(e2))
@@ -419,40 +424,45 @@ def alpha_reduction(e1: LambdaExpr, e2: LambdaExpr) -> LambdaExpr:
 def alpha_equivalent(e1: LambdaExpr, e2: LambdaExpr) -> bool:
     """Check if two lambda expressions differ only in the names of their bound variables."""
     # """Preforming a series of alpha-conversions (renaming)"""
-    if isinstance(e1, Id) and isinstance(e2, Id):
-        return e1 == e2 # Should've been renamed to match
 
-    elif isinstance(e1, Int) and isinstance(e2, Int):
-        return e1.n == e2.n
+    match (e1, e2):
+        case (Id(_), Id(_)):
+            return e1 == e2
 
-    elif isinstance(e1, Lambda) and isinstance(e2, Lambda):
-        if e1.var == e2.var:
-            return alpha_equivalent(e1.body, e2.body)
+        case (Int(_), Int(_)):
+            return e1.n == e2.n
 
-        new_var = get_free_name(e1, e2, base_name=e1.var)
-        e1_renamed = alpha_rename(e1, e1.var, new_var)
-        e2_renamed = alpha_rename(e2, e2.var, new_var)
+        case (Lambda(var1, body1), Lambda(var2, body2)):
+            if var1 == var2:
+                return alpha_equivalent(body1, body2)
 
-        return alpha_equivalent(e1_renamed.body, e2_renamed.body)
+            new_var: Id = get_free_name(e1, e2, base_name=var1)
+            e1_renamed: Lambda = alpha_rename(e1, old=var1, new=new_var)
+            e2_renamed: Lambda = alpha_rename(e2, old=var2, new=new_var)
 
-    elif isinstance(e1, App) and isinstance(e2, App):
-        return (alpha_equivalent(e1.func, e2.func) and
-                alpha_equivalent(e1.arg, e2.arg))
+            return alpha_equivalent(e1_renamed.body, e2_renamed.body)
 
-    elif isinstance(e1, Let) and isinstance(e2, Let):
-        if e1.decl == e2.decl:
-            return (alpha_equivalent(e1.defn, e2.defn) and
-                    alpha_equivalent(e1.body, e2.body))
+        case (App(func1, arg1), App(func2, arg2)):
+            return (alpha_equivalent(func1, func2) and
+                    alpha_equivalent(arg1, arg2))
 
-        new_var = get_free_name(e1, e2, base_name=e1.decl)
-        e1_renamed: Let = alpha_rename(e1, e1.decl, new_var)
-        e2_renamed: Let = alpha_rename(e2, e2.decl, new_var)
+        case (Let(decl1, defn1, body1), Let(decl2, defn2, body2)):
+            if decl1 == decl2:
+                return (alpha_equivalent(defn1, defn2) and
+                        alpha_equivalent(body1, body2))
 
-        return (alpha_equivalent(e1_renamed.defn, e2_renamed.defn) and
-                alpha_equivalent(e1_renamed.body, e2_renamed.body))
+            new_decl: Id = get_free_name(e1, e2, base_name=decl1)
+            e1_renamed: Let = alpha_rename(e1, old=decl1, new=new_decl)
+            e2_renamed: Let = alpha_rename(e2, old=decl2, new=new_decl)
 
-    else:
-        return False
+            return (alpha_equivalent(e1_renamed.defn, e2_renamed.defn) and
+                    alpha_equivalent(e1_renamed.body, e2_renamed.body))
+
+        case (_, _):
+            return False
+
+    return False
+
 
 # Beta reductions
 def beta_reduction(func: Lambda, arg: LambdaExpr)-> LambdaExpr:
