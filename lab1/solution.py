@@ -415,6 +415,7 @@ def alpha_rename(e: LambdaExpr, old: Id, new: Id) -> LambdaExpr:
             raise NotImplementedError(f"Unsupported expression type: {type(e)}")
 
 def alpha_reduction(e1: LambdaExpr, e2: LambdaExpr) -> LambdaExpr:
+    # DEPRECATED
     shared: set[Id] = get_bound(e1).intersection(get_bound(e2))
 
     for name in shared:
@@ -439,10 +440,10 @@ def alpha_equivalent(e1: LambdaExpr, e2: LambdaExpr) -> bool:
                 return alpha_equivalent(body1, body2)
 
             new_var: Id = get_free_name(e1, e2, base_name=var1)
-            e1_renamed: Lambda = alpha_rename(e1, old=var1, new=new_var)
-            e2_renamed: Lambda = alpha_rename(e2, old=var2, new=new_var)
+            renamed_body1: Lambda = alpha_rename(body1, old=var1, new=new_var)
+            renamed_body2: Lambda = alpha_rename(body2, old=var2, new=new_var)
 
-            return alpha_equivalent(e1_renamed.body, e2_renamed.body)
+            return alpha_equivalent(renamed_body1, renamed_body2)
 
         case (App(func1, arg1), App(func2, arg2)):
             return (alpha_equivalent(func1, func2) and
@@ -540,8 +541,8 @@ def beta_reduction(func: Lambda, arg: LambdaExpr)-> LambdaExpr:
                 new_decl = get_free_name(body, new, bound_names={decl}, base_name=decl)
                 new_body = alpha_rename(body, old=decl, new=new_decl)
                 return Let(new_decl,
-                           replace(new_body, old, new),
-                           replace(body, decl, new))
+                           replace(defn, old, new),
+                           new_body)
 
             case _:
                 raise NotImplementedError(f"Unsupported expression type: {type(e)}")
@@ -554,7 +555,6 @@ def is_eta_redex(e: LambdaExpr) -> bool:
     return (isinstance(e, Lambda)       and
             isinstance(e.body, App)     and
             isinstance(e.body.arg, Id)  and
-            not isinstance(e.body.func, Id) and
             e.body.arg == e.var         and
             e.var not in get_free(e.body.func))
 
@@ -568,12 +568,12 @@ def eta_reduction(e: LambdaExpr) -> LambdaExpr:
             return e
 
         case Lambda(var, body):
-            new_body = alpha_rename(body, old=var, new=var)
+            eta_reduced_body = eta_reduction(body)
 
-            if is_eta_redex(Lambda(var, new_body)):
-                return new_body.func
+            if is_eta_redex(Lambda(var, eta_reduced_body)):
+                return eta_reduced_body.func
 
-            return Lambda(var, new_body)
+            return Lambda(var, eta_reduced_body)
 
         case App(func, arg):
             return App(eta_reduction(func),
@@ -657,9 +657,8 @@ def interpret(e: LambdaExpr, fuel: int = 100_000) -> LambdaExpr:
 
     while fuel > 0:
         reduced = normal_order_reduction(result)
-        reduced = eta_reduction(reduced)
         if alpha_equivalent(reduced, result):
-            return reduced
+            return eta_reduction(result)
         result = reduced
         fuel -= 1
 
