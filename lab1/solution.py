@@ -55,6 +55,97 @@ Returns:
 - `FALSE` otherwise.
 """
 
+AND     = Lambda(Id('p'),
+                 Lambda(Id('q'),
+                        App(App(Id('p'), Id('q')), Id('p'))
+                        )
+                 )
+"""
+The `AND` lambda expression represents logical conjunction (AND) in lambda calculus.
+It is defined as: `\\p q. ((p q) p)`
+
+Explanation:
+- `p` and `q` are boolean values (TRUE or FALSE).
+- If `p` is TRUE, the result is `q`.
+- If `p` is FALSE, the result is `p` (FALSE).
+
+Returns:
+- `TRUE` if both `p` and `q` are TRUE.
+- `FALSE` otherwise.
+"""
+
+OR      = Lambda(Id('p'),
+                 Lambda(Id('q'),
+                        App(App(Id('p'), Id('p')), Id('q'))
+                        )
+                 )
+"""
+The `OR` lambda expression represents logical disjunction (OR) in lambda calculus.
+It is defined as: `\\p q. ((p p) q)`
+
+Explanation:
+- `p` and `q` are boolean values (TRUE or FALSE).
+- If `p` is TRUE, the result is `p` (TRUE).
+- If `p` is FALSE, the result is `q`.
+
+Returns:
+- `TRUE` if at least one of `p` or `q` is TRUE.
+- `FALSE` otherwise.
+"""
+
+NOT = Lambda(Id('p'),
+             App(App(Id('p'), FALSE), TRUE)
+             )
+"""
+The `NOT` lambda expression represents logical negation in lambda calculus.
+It is defined as: `\\p. (p FALSE TRUE)`
+
+Explanation:
+- `p` is a boolean value (TRUE or FALSE).
+- `p` is applied to `FALSE` and `TRUE`.
+- If `p` is TRUE (i.e., `\\x y. x`), the result is FALSE.
+- If `p` is FALSE (i.e., `\\x y. y`), the result is TRUE.
+
+Returns:
+- The boolean opposite of `p`.
+"""
+
+XOR = Lambda(Id('p'),
+             Lambda(Id('q'),
+                    App(App(Id('p'), App(NOT, Id('q'))), Id('q'))
+                    )
+             )
+"""
+The `XOR` (exclusive or) lambda expression returns TRUE if exactly one of its arguments is TRUE.
+It is defined as: `\\p q. (p (NOT q) q)`
+
+Explanation:
+- If `p` is TRUE, return `NOT q`.
+- If `p` is FALSE, return `q`.
+
+Returns:
+- `TRUE` if exactly one of `p` or `q` is TRUE.
+- `FALSE` otherwise.
+"""
+
+NAND = Lambda(Id('p'),
+              Lambda(Id('q'),
+                     App(NOT, App(App(Id('p'), Id('q')), Id('p')))
+                     )
+              )
+"""
+The `NAND` (not and) lambda expression returns TRUE unless both arguments are TRUE.
+It is defined as: `\\p q. NOT ((p q) p)`
+
+Explanation:
+- `p q` is the AND operation.
+- We negate it using `NOT`.
+
+Returns:
+- `FALSE` only if both `p` and `q` are TRUE.
+- `TRUE` otherwise.
+"""
+
 SUCC    = Lambda(Id('n'),
                  Lambda(Id('f'),
                         Lambda(Id('x'),
