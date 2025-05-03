@@ -61,10 +61,42 @@ MULT = Lambda(Id('m'), Lambda(Id('n'), Lambda(Id('f'), App(Id('m'), App(Id('n'),
 LEQ = Lambda(Id("m"), Lambda(Id("n"), App(ISZERO, App(App(SUB, Id("m")), Id("n")))))
 """Less than or equal comparison: λm.λn.ISZERO ((SUB m) n)"""
 
+EQ = Lambda(Id("m"), Lambda(Id("n"),
+         App(App(AND,
+             App(App(LEQ, Id("m")), Id("n"))),
+             App(App(LEQ, Id("n")), Id("m")))
+))
+"""Equality: λm.λn.((LEQ m n) AND (LEQ n m))"""
+
+NEQ = Lambda(Id("m"), Lambda(Id("n"), App(NOT, App(App(EQ, Id("m")), Id("n")))))
+"""Inequality: λm.λn.NOT (EQ m n)"""
+
 # Recursion
 Y = Lambda(Id('f'), App(Lambda(Id('x'), App(Id('f'), App(Id('x'), Id('x')))),
                          Lambda(Id('x'), App(Id('f'), App(Id('x'), Id('x'))))))
 """Y combinator (fixed-point combinator): λf.((λx.(f (x x))) (λx.(f (x x))))"""
+
+GCD = App(Y, Lambda(Id('r'), Lambda(Id('a'), Lambda(Id('b'),
+                    App(
+                        App(
+                            App(IF, App(App(NEQ, Id('a')), Id('b'))),
+                            App(
+                                App(
+                                    App(IF, App(App(LEQ, Id('a')), Id('b'))),
+                                    App(App(Id('r'), Id('a')), App(App(SUB, Id('b')), Id('a')))
+                                ),
+                                App(App(Id('r'), App(App(SUB, Id('a')), Id('b'))), Id('b'))
+                            )
+                        ), Id('a'))))))
+"""
+GCD:        Y ( λr. λa. λb.
+                IF  (NEQ (a) (b))
+                    (IF 
+                    (LEQ (a) (b))   // Then
+                        (r a (SUB (b) (a))) // GCD(a, b-a)
+                        (r (SUB (a) (b)) b) // GCD(a-b, b)
+                    a)              // Else
+"""
 
 
 ###########################################
@@ -251,16 +283,6 @@ def alpha_rename(e: LambdaExpr, old: Id, new: Id) -> LambdaExpr:
         case _:
             raise NotImplementedError(f"Unsupported expression type: {type(e)}")
 
-# def alpha_reduction(e1: LambdaExpr, e2: LambdaExpr) -> LambdaExpr:
-#     # DEPRECATED
-#     shared: set[Id] = get_bound(e1).intersection(get_bound(e2))
-#
-#     for name in shared:
-#         new_name: Id = get_free_name(e1, e2, base_name=name)
-#         e2 = alpha_rename(e=e2, old=name, new=new_name)
-#
-#     return e2
-
 def alpha_equivalent(e1: LambdaExpr, e2: LambdaExpr) -> bool:
     """Check if two lambda expressions differ only in the names of their bound variables."""
     # """Preforming a series of alpha-conversions (renaming)"""
@@ -417,83 +439,10 @@ def eta_reduction(e: LambdaExpr) -> LambdaExpr:
 
 
 ###########################################
-#         COMBINATOR DETECTION            #
-###########################################
-
-def is_y_combinator(e: LambdaExpr) -> bool:
-    # (\f. (\x. f (x x)) (\x. f (x x)))
-    match e:
-        case Lambda(Id(f),
-                        App(Lambda(Id(x1), App(Id(f1), App(Id(x11), Id(x12)))),
-                            Lambda(Id(x2), App(Id(f2), App(Id(x21), Id(x22)))))):
-            return (f1 == f2 == f and
-                    x1 == x11 == x12 and
-                    x2 == x21 == x22)
-
-        case _:
-            return False
-
-def is_z_combinator(e: LambdaExpr) -> bool:
-    # (\f. (\x. f (\y. x x y)) (\x. f (\y. x x y)))
-    match e:
-        case Lambda(Id(f),
-                        App(Lambda(Id(x1),
-                                   App(Id(f1), Lambda(Id(y1),
-                                                      App(App(Id(x11), Id(x12)), Id(y11))))),
-                            Lambda(Id(x2),
-                                   App(Id(f2), Lambda(Id(y2),
-                                                      App(App(Id(x21), Id(x22)), Id(y21)))))
-                            )):
-            return (f1 == f2 == f and
-                    y1 == y11 and
-                    y2 == y21 and
-                    x1 == x11 == x12 and
-                    x2 == x21 == x22)
-
-        case _:
-            return False
-
-def is_inside_y_combinator(e: LambdaExpr) -> bool:
-    # (\f. (\x. f (x x)) (\x. f (x x)))
-    match e:
-        case App(Lambda(Id(x1), App(Id(f1), App(Id(x11), Id(x12)))),
-                            Lambda(Id(x2), App(Id(f2), App(Id(x21), Id(x22))))):
-            return (f1 == f2 and
-                    x1 == x11 == x12 and
-                    x2 == x21 == x22 and
-                    x1 == x2)
-
-        case _:
-            return False
-
-def is_inside_z_combinator(e: LambdaExpr) -> bool:
-    # (\f. (\x. f (\y. x x y)) (\x. f (\y. x x y)))
-    match e:
-        case App(Lambda(Id(x1),
-                                   App(Id(f1), Lambda(Id(y1),
-                                                      App(App(Id(x11), Id(x12)), Id(y11))))),
-                            Lambda(Id(x2),
-                                   App(Id(f2), Lambda(Id(y2),
-                                                      App(App(Id(x21), Id(x22)), Id(y21)))))
-                 ):
-            return (f1 == f2 and
-                    y1 == y11 and
-                    y2 == y21 and
-                    x1 == x11 == x12 and
-                    x2 == x21 == x22)
-
-        case _:
-            return False
-
-
-###########################################
 #         EVALUATION                      #
 ###########################################
 
 def normal_order_reduction(e: LambdaExpr) -> LambdaExpr:
-
-    if is_inside_y_combinator(e) or is_inside_z_combinator(e) or is_y_combinator(e) or is_z_combinator(e):
-        return e
 
     match e:
         case Id(_):
@@ -508,14 +457,6 @@ def normal_order_reduction(e: LambdaExpr) -> LambdaExpr:
             return normal_order_reduction(App(e_lambda, defn))
 
         case Lambda(var, body):
-            # Check if the body is a redex
-            # if isinstance(body, App):
-            #     if isinstance(body.func, Lambda):
-            #         return beta_reduction(body.func, body.arg)
-            #     else:
-            #         return App(Lambda(var, normal_order_reduction(body)), body.arg)
-            # else:
-            #     return Lambda(var, normal_order_reduction(body))
             reduced_body = normal_order_reduction(body)
             if alpha_equivalent(reduced_body, body):
                 return e

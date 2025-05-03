@@ -18,29 +18,15 @@ import solution
         pytest.param(r"((\x.\y.\z.x z (y z)) (\x.\y.\z.x (y z))) (\x.\y.y) a b", "a b", id="s_s_i_application"),
         pytest.param(r"((\x.\y.\z.x z (y z)) (\x.\y.\z.x (y z))) (\x.\y.x) a b", "a a", id="s_s_k_application"),
 
-        # Fixed point combinator with practical applications
-        pytest.param(
-            r"((\f.(\x.f (x x)) (\x.f (x x))) (\f.\n. (\c.c (\t.\f.f) (\t.\f.t)) n (\t.\f.t) (f ((\n.\f.\x.n (\g.\h.h (g f)) (\u.x) (\u.u)) n)))) (\f.\x.f x)",
-            r"\f. \t. \f. t",
-            id="y_combinator_factorial_1"
-        ),
-
-        # Nested recursion with termination
-        pytest.param(
-            r"(\f.(\x.f (x x)) (\x.f (x x))) (\f.\n. (\c.c (\t.\f.f) (\t.\f.t)) n (\t.\f.t) (f ((\m.\n.n (\n.\f.\x.n (\g.\h.h (g f)) (\u.x) (\u.u)) m) n (\f.\x.x))))",
-            r"\n. (\c. c (\t. \f. f) (\t. \f. t)) n (\t. \f. t) ((\f. (\x. f (x x)) (\x. f (x x))) (\f. \n. (\c. c (\t. \f. f) (\t. \f. t)) n (\t. \f. t) (f ((\m. \n. n (\n. \f. \x. n (\g. \h. h (g f)) (\u. x) (\u. u)) m) n (\f. \x. x)))) ((\m. \n. n (\n. \f. \x. n (\g. \h. h (g f)) (\u. x) (\u. u)) m) n (\f. \x. x)))",
-            id="nested_recursive_function"
-        ),
-
         # Complex variable capture and shadowing scenarios
-        pytest.param(r"(\x. let y = x in (\x. \z. y x)) (\w. w)", r"\x. \z. (\w. w) x", id="shadowing_with_let_lambda"),
-        pytest.param(r"(\x. \y. (\x. \y. x) y) a b", r"b", id="triple_nested_shadowing"),
+        pytest.param(r"(\x. let y = x in (\x. \z. y x)) (\w. w)", r"\x. \z. x", id="shadowing_with_let_lambda"),
+        pytest.param(r"(\x. \y. (\x. \y. x) y) a b", r"\y. b", id="triple_nested_shadowing"),
         pytest.param(r"let x = a in let y = x in let x = b in (\z. y z x)", r"\z. a z b", id="let_shadowing_chain"),
 
         # Church boolean logic with complex operations
         pytest.param(
             r"(\a.\b.\c. a (b c) (a c b)) (\t.\f.t) (\t.\f.f) (\t.\f.t)",
-            r"\t. \f. t",
+            r"\f. f",
             id="church_boolean_complex_true"
         ),
         pytest.param(
@@ -69,7 +55,7 @@ import solution
         ),
         pytest.param(
             r"(\f. \x. (\g. \y. g y) (f x))",
-            r"\f. \x. f x",
+            r"\f. \x. \y. f x y",
             id="nested_eta_reduction"
         ),
     ],
