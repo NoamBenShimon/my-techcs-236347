@@ -682,13 +682,12 @@ def eta_reduction(e: LambdaExpr) -> LambdaExpr:
 def is_y_combinator(e: LambdaExpr) -> bool:
     # (\f. (\x. f (x x)) (\x. f (x x)))
     match e:
-        case App(Lambda(Id(f)),
+        case Lambda(Id(f),
                         App(Lambda(Id(x1), App(Id(f1), App(Id(x11), Id(x12)))),
                             Lambda(Id(x2), App(Id(f2), App(Id(x21), Id(x22)))))):
             return (f1 == f2 == f and
                     x1 == x11 == x12 and
-                    x2 == x21 == x22 and
-                    x1 == x2)
+                    x2 == x21 == x22)
 
         case _:
             return False
@@ -696,16 +695,47 @@ def is_y_combinator(e: LambdaExpr) -> bool:
 def is_z_combinator(e: LambdaExpr) -> bool:
     # (\f. (\x. f (\y. x x y)) (\x. f (\y. x x y)))
     match e:
-        case App(Lambda(Id(f)),
+        case Lambda(Id(f),
                         App(Lambda(Id(x1),
                                    App(Id(f1), Lambda(Id(y1),
                                                       App(App(Id(x11), Id(x12)), Id(y11))))),
                             Lambda(Id(x2),
                                    App(Id(f2), Lambda(Id(y2),
                                                       App(App(Id(x21), Id(x22)), Id(y21)))))
-                            )
-                 ):
+                            )):
             return (f1 == f2 == f and
+                    y1 == y11 and
+                    y2 == y21 and
+                    x1 == x11 == x12 and
+                    x2 == x21 == x22)
+
+        case _:
+            return False
+
+def is_inside_y_combinator(e: LambdaExpr) -> bool:
+    # (\f. (\x. f (x x)) (\x. f (x x)))
+    match e:
+        case App(Lambda(Id(x1), App(Id(f1), App(Id(x11), Id(x12)))),
+                            Lambda(Id(x2), App(Id(f2), App(Id(x21), Id(x22))))):
+            return (f1 == f2 and
+                    x1 == x11 == x12 and
+                    x2 == x21 == x22 and
+                    x1 == x2)
+
+        case _:
+            return False
+
+def is_inside_z_combinator(e: LambdaExpr) -> bool:
+    # (\f. (\x. f (\y. x x y)) (\x. f (\y. x x y)))
+    match e:
+        case App(Lambda(Id(x1),
+                                   App(Id(f1), Lambda(Id(y1),
+                                                      App(App(Id(x11), Id(x12)), Id(y11))))),
+                            Lambda(Id(x2),
+                                   App(Id(f2), Lambda(Id(y2),
+                                                      App(App(Id(x21), Id(x22)), Id(y21)))))
+                 ):
+            return (f1 == f2 and
                     y1 == y11 and
                     y2 == y21 and
                     x1 == x11 == x12 and
@@ -729,6 +759,9 @@ def normal_order_reduction(e: LambdaExpr) -> LambdaExpr:
         NotImplementedError: If the expression type is not supported.
 
     """
+
+    if is_inside_y_combinator(e) or is_inside_z_combinator(e):
+        return e
 
     match e:
         case Id(_):
@@ -785,7 +818,7 @@ def interpret(e: LambdaExpr, fuel: int = 100_000) -> LambdaExpr:
     while fuel > 0:
         reduced = normal_order_reduction(result)
         if alpha_equivalent(reduced, result):
-            return eta_reduction(result)
+            return result
         result = reduced
         fuel -= 1
 
