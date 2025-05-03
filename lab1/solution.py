@@ -3,297 +3,73 @@ from unittest import case
 from syntax.lambda_pure import *
 from syntax.lambda_pure import Id
 
-# Popular lambda-expressions
-TRUE    = Lambda(Id('x'), Lambda(Id('y'), Id('x')))
-"""
-The `TRUE` lambda expression represents the boolean value `True` in lambda calculus.
-It is defined as: `\\x y. x`
-When applied to two arguments, it always returns the first argument.
-"""
+###########################################
+#         CHURCH ENCODINGS                #
+###########################################
 
-FALSE   = Lambda(Id('x'), Lambda(Id('y'), Id('y')))
-"""
-The `FALSE` lambda expression represents the boolean value `False` in lambda calculus.
-It is defined as: `\\x y. y`
-When applied to two arguments, it always returns the second argument.
-"""
+# Boolean values and operations
+TRUE = Lambda(Id('x'), Lambda(Id('y'), Id('x')))
+"""The Church encoding for boolean TRUE: λx.λy.x"""
 
-IF      = Lambda(Id('b'), Lambda(Id('x'), Lambda(Id('y'), App(App(Id('b'), Id('x')), Id('y')))))
-"""
-The `IF` lambda expression represents a conditional statement in lambda calculus.
-It is defined as: `\\b x y. ((b x) y)`
+FALSE = Lambda(Id('x'), Lambda(Id('y'), Id('y')))
+"""The Church encoding for boolean FALSE: λx.λy.y"""
 
-It takes three arguments:
-1. `b` - A boolean value (TRUE or FALSE).
-2. `x` - The value to return if `b` is TRUE.
-3. `y` - The value to return if `b` is FALSE.
+IF = Lambda(Id('b'), Lambda(Id('x'), Lambda(Id('y'), App(App(Id('b'), Id('x')), Id('y')))))
+"""Conditional expression: λb.λx.λy.((b x) y)"""
 
-The expression evaluates to `x` if `b` is TRUE, and `y` if `b` is FALSE.
-"""
+# Boolean operations
+AND = Lambda(Id('p'), Lambda(Id('q'), App(App(Id('p'), Id('q')), Id('p'))))
+"""Logical AND: λp.λq.((p q) p)"""
 
-ISZERO  = Lambda(Id("n"),
-                 App(
-                     App(Id("n"),
-                         Lambda(Id("x"), FALSE)
-                         ),
-                     TRUE
-                 )
-                 )
-"""
-The `ISZERO` lambda expression checks if a given Church numeral is zero.
+OR = Lambda(Id('p'), Lambda(Id('q'), App(App(Id('p'), Id('p')), Id('q'))))
+"""Logical OR: λp.λq.((p p) q)"""
 
-It is defined as: `\\n. (n (\\x. FALSE) TRUE)`
+NOT = Lambda(Id('p'), App(App(Id('p'), FALSE), TRUE))
+"""Logical NOT: λp.(p FALSE TRUE)"""
 
-Explanation:
-- `n` is the Church numeral to check.
-- The Church numeral `n` is applied to the function `\\x. FALSE`.
-- If `n` is zero, it does not apply the function and directly returns `TRUE`.
-- If `n` is greater than zero, it applies the function at least once, resulting in `FALSE`.
+XOR = Lambda(Id('p'), Lambda(Id('q'), App(App(Id('p'), App(NOT, Id('q'))), Id('q'))))
+"""Logical XOR: λp.λq.(p (NOT q) q)"""
 
-Returns:
-- `TRUE` if the Church numeral is zero.
-- `FALSE` otherwise.
-"""
+NAND = Lambda(Id('p'), Lambda(Id('q'), App(NOT, App(App(Id('p'), Id('q')), Id('p')))))
+"""Logical NAND: λp.λq.NOT ((p q) p)"""
 
-AND     = Lambda(Id('p'),
-                 Lambda(Id('q'),
-                        App(App(Id('p'), Id('q')), Id('p'))
-                        )
-                 )
-"""
-The `AND` lambda expression represents logical conjunction (AND) in lambda calculus.
-It is defined as: `\\p q. ((p q) p)`
+# Numeric operations
+ISZERO = Lambda(Id("n"), App(App(Id("n"), Lambda(Id("x"), FALSE)), TRUE))
+"""Check if a Church numeral is zero: λn.(n (λx.FALSE) TRUE)"""
 
-Explanation:
-- `p` and `q` are boolean values (TRUE or FALSE).
-- If `p` is TRUE, the result is `q`.
-- If `p` is FALSE, the result is `p` (FALSE).
+SUCC = Lambda(Id('n'), Lambda(Id('f'), Lambda(Id('x'),
+                App(Id('f'), App(App(Id('n'), Id('f')), Id('x'))))))
+"""Church numeral successor: λn.λf.λx.(f ((n f) x))"""
 
-Returns:
-- `TRUE` if both `p` and `q` are TRUE.
-- `FALSE` otherwise.
-"""
+PRED = Lambda(Id("n"), Lambda(Id("f"), Lambda(Id("x"),
+                App(App(App(Id("n"),
+                    Lambda(Id("g"), Lambda(Id("h"), App(Id("h"), App(Id("g"), Id("f")))))),
+                    Lambda(Id("u"), Id("x"))),
+                    Lambda(Id("u"), Id("u"))))))
+"""Church numeral predecessor: λn.λf.λx.(n (λg.λh.(h (g f))) (λu.x) (λu.u))"""
 
-OR      = Lambda(Id('p'),
-                 Lambda(Id('q'),
-                        App(App(Id('p'), Id('p')), Id('q'))
-                        )
-                 )
-"""
-The `OR` lambda expression represents logical disjunction (OR) in lambda calculus.
-It is defined as: `\\p q. ((p p) q)`
+ADD = Lambda(Id('m'), Lambda(Id('n'), Lambda(Id('f'), Lambda(Id('x'),
+                App(App(Id('m'), Id('f')), App(App(Id('n'), Id('f')), Id('x')))))))
+"""Church numeral addition: λm.λn.λf.λx.((m f) ((n f) x))"""
 
-Explanation:
-- `p` and `q` are boolean values (TRUE or FALSE).
-- If `p` is TRUE, the result is `p` (TRUE).
-- If `p` is FALSE, the result is `q`.
+SUB = Lambda(Id("m"), Lambda(Id("n"), App(App(Id("n"), PRED), Id("m"))))
+"""Church numeral subtraction: λm.λn.((n PRED) m)"""
 
-Returns:
-- `TRUE` if at least one of `p` or `q` is TRUE.
-- `FALSE` otherwise.
-"""
+MULT = Lambda(Id('m'), Lambda(Id('n'), Lambda(Id('f'), App(Id('m'), App(Id('n'), Id('f'))))))
+"""Church numeral multiplication: λm.λn.λf.(m (n f))"""
 
-NOT = Lambda(Id('p'),
-             App(App(Id('p'), FALSE), TRUE)
-             )
-"""
-The `NOT` lambda expression represents logical negation in lambda calculus.
-It is defined as: `\\p. (p FALSE TRUE)`
+LEQ = Lambda(Id("m"), Lambda(Id("n"), App(ISZERO, App(App(SUB, Id("m")), Id("n")))))
+"""Less than or equal comparison: λm.λn.ISZERO ((SUB m) n)"""
 
-Explanation:
-- `p` is a boolean value (TRUE or FALSE).
-- `p` is applied to `FALSE` and `TRUE`.
-- If `p` is TRUE (i.e., `\\x y. x`), the result is FALSE.
-- If `p` is FALSE (i.e., `\\x y. y`), the result is TRUE.
+# Recursion
+Y = Lambda(Id('f'), App(Lambda(Id('x'), App(Id('f'), App(Id('x'), Id('x')))),
+                         Lambda(Id('x'), App(Id('f'), App(Id('x'), Id('x'))))))
+"""Y combinator (fixed-point combinator): λf.((λx.(f (x x))) (λx.(f (x x))))"""
 
-Returns:
-- The boolean opposite of `p`.
-"""
 
-XOR = Lambda(Id('p'),
-             Lambda(Id('q'),
-                    App(App(Id('p'), App(NOT, Id('q'))), Id('q'))
-                    )
-             )
-"""
-The `XOR` (exclusive or) lambda expression returns TRUE if exactly one of its arguments is TRUE.
-It is defined as: `\\p q. (p (NOT q) q)`
-
-Explanation:
-- If `p` is TRUE, return `NOT q`.
-- If `p` is FALSE, return `q`.
-
-Returns:
-- `TRUE` if exactly one of `p` or `q` is TRUE.
-- `FALSE` otherwise.
-"""
-
-NAND = Lambda(Id('p'),
-              Lambda(Id('q'),
-                     App(NOT, App(App(Id('p'), Id('q')), Id('p')))
-                     )
-              )
-"""
-The `NAND` (not and) lambda expression returns TRUE unless both arguments are TRUE.
-It is defined as: `\\p q. NOT ((p q) p)`
-
-Explanation:
-- `p q` is the AND operation.
-- We negate it using `NOT`.
-
-Returns:
-- `FALSE` only if both `p` and `q` are TRUE.
-- `TRUE` otherwise.
-"""
-
-SUCC    = Lambda(Id('n'),
-                 Lambda(Id('f'),
-                        Lambda(Id('x'),
-                               App(Id('f'), App(App(Id('n'), Id('f')), Id('x')))
-                               )
-                        )
-                 )
-"""
-The `SUCC` lambda expression represents the successor function in lambda calculus.
-It is defined as: `\\n f x. (f ((n f) x))`
-
-It takes a Church numeral `n` and returns the Church numeral representing `n + 1`.
-- `f` is the function to apply.
-- `x` is the initial value.
-"""
-
-PRED    = Lambda(Id("n"),
-                 Lambda(Id("f"),
-                        Lambda(Id("x"),
-                               App(
-                                   App(
-                                       App(Id("n"),
-                                           Lambda(Id("g"),
-                                                  Lambda(Id("h"),
-                                                         App(Id("h"), App(Id("g"), Id("f")))
-                                                         )
-                                                  )
-                                           ),
-                                       Lambda(Id("u"), Id("x"))
-                                   ),
-                                   Lambda(Id("u"), Id("u"))
-                               )
-                               )
-                        )
-                 )
-"""
-The `PRED` lambda expression represents the predecessor function in lambda calculus.
-It is defined as: `\\n f x. (n (\\g h. (h (g f))) (\\u. x) (\\u. u))`
-
-Explanation:
-- `n` is the Church numeral whose predecessor is to be computed.
-- `f` is the function to apply.
-- `x` is the initial value.
-- The function works by constructing a pair of values and returning the first value, effectively decrementing the numeral.
-
-Steps:
-1. `n` is applied to the function `\\g h. (h (g f))`, which builds a pair of values.
-2. The second argument `\\u. x` initializes the pair with `x`.
-3. The third argument `\\u. u` ensures the correct structure for the pair.
-
-Returns:
-- The Church numeral representing `n - 1`.
-- If `n` is 0, the result is the Church numeral for 0 (no negative numbers in Church numerals).
-"""
-
-ADD     = Lambda(Id('m'),
-                 Lambda(Id('n'),
-                        Lambda(Id('f'),
-                               Lambda(Id('x'),
-                                      App(App(Id('m'), Id('f')), App(App(Id('n'), Id('f')), Id('x')))
-                                      )
-                               )
-                        )
-                 )
-"""
-The `ADD` lambda expression represents addition of two Church numerals in lambda calculus.
-It is defined as: `\\m n f x. ((m f) ((n f) x))`
-
-It takes two Church numerals `m` and `n` and returns their sum as a Church numeral.
-- `f` is the function to apply.
-- `x` is the initial value.
-"""
-
-SUB     = Lambda(Id("m"),
-                 Lambda(Id("n"),
-                        App(App(Id("n"), PRED), Id("m"))
-                        )
-                 )
-"""
-The `SUB` lambda expression represents subtraction of two Church numerals in lambda calculus.
-It is defined as: `\\m n. ((n PRED) m)`
-
-Explanation:
-- `m` is the minuend (the number from which another number is subtracted).
-- `n` is the subtrahend (the number to subtract).
-- `PRED` is the predecessor function, which decrements a Church numeral by 1.
-
-The expression applies the predecessor function `n` times to `m`, effectively computing `m - n`.
-
-Returns:
-- The Church numeral representing the result of `m - n`.
-- If `n > m`, the result is the Church numeral for 0 (no negative numbers in Church numerals).
-"""
-
-MULT    = Lambda(Id('m'),
-                 Lambda(Id('n'),
-                        Lambda(Id('f'),
-                               App(Id('m'), App(Id('n'), Id('f')))
-                               )
-                        )
-                 )
-"""
-The `MULT` lambda expression represents multiplication of two Church numerals in lambda calculus.
-It is defined as: `\\m n f. (m (n f))`
-
-It takes two Church numerals `m` and `n` and returns their product as a Church numeral.
-- `f` is the function to apply.
-"""
-
-LEQ     = Lambda(Id("m"),
-                 Lambda(Id("n"),
-                        App(
-                            ISZERO,
-                            App(App(SUB, Id("m")), Id("n"))
-                        )
-                        )
-                 )
-"""
-The `LEQ` lambda expression represents the "less than or equal to" comparison for Church numerals in lambda calculus.
-It is defined as: `\\m n. ISZERO ((SUB m) n)`
-
-Explanation:
-- `m` and `n` are Church numerals to compare.
-- `SUB` computes the subtraction `m - n`.
-- `ISZERO` checks if the result of `m - n` is zero.
-
-Returns:
-- `TRUE` if `m` is less than or equal to `n`.
-- `FALSE` otherwise.
-"""
-
-Y       = Lambda(Id('f'),
-                 App(
-                     Lambda(Id('x'),
-                            App(Id('f'), App(Id('x'), Id('x')))
-                            ),
-                     Lambda(Id('x'),
-                            App(Id('f'), App(Id('x'), Id('x')))
-                            )
-                     )
-                 )
-"""
-The `Y` lambda expression represents the Y-combinator (fixed-point combinator) in lambda calculus.
-It is defined as: `\\f. ((\\x. (f (x x))) (\\x. (f (x x))))`
-
-The Y-combinator allows for the definition of recursive functions in lambda calculus.
-- `f` is the function to which the fixed-point combinator is applied.
-"""
+###########################################
+#         VARIABLE MANAGEMENT             #
+###########################################
 
 # Get bound & free variables
 def get_bound(context: LambdaExpr) -> set[Id]:
@@ -315,10 +91,7 @@ def get_bound(context: LambdaExpr) -> set[Id]:
     """
 
     match context:
-        case Id(_):
-            return set()
-
-        case Int(_):
+        case Id(_) | Int(_):
             return set()
 
         case Lambda(var, body):
@@ -370,10 +143,7 @@ def is_name_bound(name: Id, context: LambdaExpr) -> bool:
     """
 
     match context:
-        case Id(_):
-            return False
-
-        case Int(_):
+        case Id(_) | Int(_):
             return False
 
         case Lambda(var, body):
@@ -393,16 +163,6 @@ def is_name_bound(name: Id, context: LambdaExpr) -> bool:
             raise NotImplementedError(f"Unsupported expression type: {type(context)}")
 
 def is_name_free(name: Id, context: LambdaExpr) -> bool:
-    """
-    Check if a name is free var in a given context.
-    Args:
-        name    (Id):           The name to check.
-        context (LambdaExpr):   The context in which to check for the name.
-
-    Returns:
-        bool: `True` if the name is free in the context, `False` otherwise.
-
-    """
     return name in get_free(context)
 
 def get_free_name(*args: LambdaExpr, bound_names: set[Id] = None,
@@ -438,7 +198,6 @@ def get_free_name(*args: LambdaExpr, bound_names: set[Id] = None,
             new_name: Id = Id(f"{base_name.name}{counter}")
 
         is_free: bool = new_name not in bound_names
-
         if is_free:
             for expr in args:
                 if expr is not None and is_name_bound(new_name, expr):
@@ -452,29 +211,16 @@ def get_free_name(*args: LambdaExpr, bound_names: set[Id] = None,
 
     raise RecursionError(f"Maximum recursion depth {safety_limit} exceeded")
 
-# Alpha reductions
+
+###########################################
+#         ALPHA CONVERSIONS               #
+###########################################
+
 def alpha_rename(e: LambdaExpr, old: Id, new: Id) -> LambdaExpr:
-    """
-    Perform alpha-renaming on a lambda expression.
-
-    Args:
-        e   (LambdaExpr):   The lambda expression to be renamed.
-        old (Id):           The old name to be replaced.
-        new (Id):           The new name to replace the old name.
-
-    Returns:
-        LambdaExpr: The lambda expression after alpha-renaming.
-
-    Raises:
-        NotImplementedError: If the expression type is not supported.
-
-    """
 
     match e:
         case Id(_):
-            if e == old:
-                return new
-            return e
+            return new if e == old else e
 
         case Int(_):
             return e
@@ -505,15 +251,15 @@ def alpha_rename(e: LambdaExpr, old: Id, new: Id) -> LambdaExpr:
         case _:
             raise NotImplementedError(f"Unsupported expression type: {type(e)}")
 
-def alpha_reduction(e1: LambdaExpr, e2: LambdaExpr) -> LambdaExpr:
-    # DEPRECATED
-    shared: set[Id] = get_bound(e1).intersection(get_bound(e2))
-
-    for name in shared:
-        new_name: Id = get_free_name(e1, e2, base_name=name)
-        e2 = alpha_rename(e=e2, old=name, new=new_name)
-
-    return e2
+# def alpha_reduction(e1: LambdaExpr, e2: LambdaExpr) -> LambdaExpr:
+#     # DEPRECATED
+#     shared: set[Id] = get_bound(e1).intersection(get_bound(e2))
+#
+#     for name in shared:
+#         new_name: Id = get_free_name(e1, e2, base_name=name)
+#         e2 = alpha_rename(e=e2, old=name, new=new_name)
+#
+#     return e2
 
 def alpha_equivalent(e1: LambdaExpr, e2: LambdaExpr) -> bool:
     """Check if two lambda expressions differ only in the names of their bound variables."""
@@ -557,21 +303,13 @@ def alpha_equivalent(e1: LambdaExpr, e2: LambdaExpr) -> bool:
 
     return False
 
-# Beta reductions
+
+###########################################
+#         BETA REDUCTIONS                 #
+###########################################
+
 def beta_reduction(func: Lambda, arg: LambdaExpr)-> LambdaExpr:
-    """
-    Perform beta-reduction on a lambda expression.
-    Args:
-        func    (Lambda):       The lambda expression to be reduced.
-        arg     (LambdaExpr):   The argument to be applied to the lambda expression.
 
-    Returns:
-        LambdaExpr: The lambda expression after beta-reduction.
-
-    Raises:
-        NotImplementedError: If the expression type is not supported.
-
-    """
     def replace(e: LambdaExpr, old: Id, new: LambdaExpr) -> LambdaExpr:
         """
         Replace all occurrences of old with new in the expression e.
@@ -591,9 +329,7 @@ def beta_reduction(func: Lambda, arg: LambdaExpr)-> LambdaExpr:
 
         match e:
             case Id(_):
-                if e == old:
-                    return new
-                return e
+                return new if e == old else e
 
             case Int(_):
                 return e
@@ -640,7 +376,11 @@ def beta_reduction(func: Lambda, arg: LambdaExpr)-> LambdaExpr:
 
     return replace(func.body, old=func.var, new=arg)
 
-# Eta reductions
+
+###########################################
+#         ETA REDUCTIONS                  #
+###########################################
+
 def is_eta_redex(e: LambdaExpr) -> bool:
 
     return (isinstance(e, Lambda)       and
@@ -652,10 +392,7 @@ def is_eta_redex(e: LambdaExpr) -> bool:
 def eta_reduction(e: LambdaExpr) -> LambdaExpr:
 
     match e:
-        case Id(_):
-            return e
-
-        case Int(_):
+        case Id(_) | Int(_):
             return e
 
         case Lambda(var, body):
@@ -678,7 +415,11 @@ def eta_reduction(e: LambdaExpr) -> LambdaExpr:
         case _:
             raise NotImplementedError(f"Unsupported expression type: {type(e)}")
 
-# Y combinator handling
+
+###########################################
+#         COMBINATOR DETECTION            #
+###########################################
+
 def is_y_combinator(e: LambdaExpr) -> bool:
     # (\f. (\x. f (x x)) (\x. f (x x)))
     match e:
@@ -744,23 +485,14 @@ def is_inside_z_combinator(e: LambdaExpr) -> bool:
         case _:
             return False
 
-# Other reductions
+
+###########################################
+#         EVALUATION                      #
+###########################################
+
 def normal_order_reduction(e: LambdaExpr) -> LambdaExpr:
-    """
-    Perform normal-order reduction on a lambda expression.
 
-    Args:
-        e (LambdaExpr):   The lambda expression to be reduced.
-
-    Returns:
-        LambdaExpr: The lambda expression after normal-order reduction.
-
-    Raises:
-        NotImplementedError: If the expression type is not supported.
-
-    """
-
-    if is_inside_y_combinator(e) or is_inside_z_combinator(e):
+    if is_inside_y_combinator(e) or is_inside_z_combinator(e) or is_y_combinator(e) or is_z_combinator(e):
         return e
 
     match e:
@@ -790,18 +522,14 @@ def normal_order_reduction(e: LambdaExpr) -> LambdaExpr:
             return Lambda(var, reduced_body)
 
         case App(func, arg):
-            # Check if the function is a lambda
             if isinstance(func, Lambda):
-                # Perform beta-reduction
                 return beta_reduction(func, arg)
 
             func_reduced = normal_order_reduction(func)
-
             if not alpha_equivalent(func_reduced, func):
                 return normal_order_reduction(App(func_reduced, arg))
 
             arg_reduced = normal_order_reduction(arg)
-
             if not alpha_equivalent(arg_reduced, arg):
                 return App(func, arg_reduced)
 
@@ -814,7 +542,6 @@ def interpret(e: LambdaExpr, fuel: int = 100_000) -> LambdaExpr:
     """Keep performing normal-order reduction steps until you reach normal form, detect divergence or run out of fuel."""
 
     result = e
-
     while fuel > 0:
         reduced = normal_order_reduction(result)
         if alpha_equivalent(reduced, result):
@@ -822,7 +549,7 @@ def interpret(e: LambdaExpr, fuel: int = 100_000) -> LambdaExpr:
         result = reduced
         fuel -= 1
 
-    print("Hello: " + pretty(result))
+    print("Recursion depth exceeded; Current result: " + pretty(result))
     raise RecursionError("Maximum recursion depth exceeded")
 
 def int_to_church(n: int) -> LambdaExpr:
