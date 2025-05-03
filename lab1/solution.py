@@ -285,7 +285,7 @@ Y       = Lambda(Id('f'),
                      Lambda(Id('x'),
                             App(Id('f'), App(Id('x'), Id('x')))
                             )
-                 )
+                     )
                  )
 """
 The `Y` lambda expression represents the Y-combinator (fixed-point combinator) in lambda calculus.
@@ -677,6 +677,21 @@ def eta_reduction(e: LambdaExpr) -> LambdaExpr:
 
         case _:
             raise NotImplementedError(f"Unsupported expression type: {type(e)}")
+
+# Y combinator handling
+def is_y_combinator(e: LambdaExpr) -> bool:
+    # (\f. (\x. f (x x)) (\x. f (x x))) G
+    match e:
+        case App(Lambda(Id(f)),
+                        App(Lambda(Id(x1), App(Id(f1), App(Id(x11), Id(x12)))),
+                            Lambda(Id(x2), App(Id(f2), App(Id(x21), Id(x22)))))):
+            return (f1 == f2 == f and
+                    x1 == x11 == x12 and
+                    x2 == x21 == x22 and
+                    x1 == x2)
+
+        case _:
+            return False
 
 # Other reductions
 def normal_order_reduction(e: LambdaExpr) -> LambdaExpr:
