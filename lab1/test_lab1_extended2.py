@@ -21,7 +21,7 @@ import solution
         # Fixed point combinator with practical applications
         pytest.param(
             r"((\f.(\x.f (x x)) (\x.f (x x))) (\f.\n. (\c.c (\t.\f.f) (\t.\f.t)) n (\t.\f.t) (f ((\n.\f.\x.n (\g.\h.h (g f)) (\u.x) (\u.u)) n)))) (\f.\x.f x)",
-            r"\f. \x. f x",
+            r"\f. \t. \f. t",
             id="y_combinator_factorial_1"
         ),
 
