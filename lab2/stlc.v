@@ -60,7 +60,39 @@ Inductive Result :=
   | ExpectedArrow : Term -> Ty -> Result.
 
 Fixpoint typecheck (e : Term) (env : Valuation) :=
-  (* TODO *)
+  match e with
+  | TVar v => Ok (env v)
+  | Abs (v, t) e' => (
+    (* Recurse on body e', with an environment modified so that env'[v]=[t] *)
+    match typecheck e' (fun v' => if eq_var v v' then t else env v') with
+    | Ok t' => Ok (Arrow t t')
+    | Mismatch e'' t1 t2 => Mismatch (Abs (v, t) e'') t1 t2
+    | ExpectedArrow e'' t1 => ExpectedArrow (Abs (v, t) e'') t1
+    end
+  )
+  | App e1 e2 => (
+    match typecheck e1 env with
+    | Ok t1 => (
+      match typecheck e2 env with
+      | Ok t2 => (
+        match t1 with
+        | Arrow t3 t4 => (
+          if eq_ty t2 t3
+          then Ok t4
+          else Mismatch e2 t2 t3
+        )
+        | _ => ExpectedArrow e1 t1
+        end
+      )
+      | Mismatch e t1 t2' => Mismatch e t1 t2'
+      | ExpectedArrow e t => ExpectedArrow e t
+      end
+    )
+    | Mismatch e t1 t2 => Mismatch e t1 t2
+    | ExpectedArrow e t => ExpectedArrow e t
+    end
+  )
+  end.
 
 
 (* Examples *)
