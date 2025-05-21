@@ -34,6 +34,8 @@ def infer_types(expr: TypedExpr) -> TypedExpr:
 
     match expr:
         case VarDecl(var, varType):
+            """were given a var and its type, should be added to env. """
+
             # Type[var]     =   Type[varType]
             pass # TODO: Implement VarDecl case
 
@@ -75,3 +77,14 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def build_type_tree_with_type_dicts():
+    """
+    Builds a type tree with type dictionaries.
+    The type tree is a dictionary of dictionaries, where the outer dictionary maps variable names to types,
+    and the inner dictionary maps type names to types."""
+
+
+def solve_constraints():
+    #def apply upwards
