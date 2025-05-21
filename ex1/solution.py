@@ -5,7 +5,8 @@ Your task:
 Implement type checking and type inference for simply-typed lambda calculus.
 """
 
-from syntax.lambda_typed import parse, TypedExpr, is_grounded_expr, Id, Expr, LambdaType, VarDecl, App, Lambda, Let
+from syntax.lambda_typed import parse, TypedExpr, is_grounded_expr, Id, Expr, LambdaType, VarDecl, App, Lambda, Let, \
+    Arrow
 
 
 class TypeMismatchError(TypeError):
@@ -14,6 +15,9 @@ class TypeMismatchError(TypeError):
 
 class InsufficientAnnotationsError(TypeError):
     pass
+
+
+def solve_constraints(expr: TypedExpr, env: dict[Id, LambdaType]) -> TypedExpr:
 
 
 def infer_types(expr: TypedExpr) -> TypedExpr:
@@ -35,20 +39,48 @@ def infer_types(expr: TypedExpr) -> TypedExpr:
     match expr:
         case VarDecl(var, varType):
             # Type[var]     =   Type[varType]
+            return expr
             pass # TODO: Implement VarDecl case
 
         case Let(decl, defn, body):
             # Type[decl]    =   Type[defn]
             # Type[expr]    =   Type[body] // TODO: Recheck
-            pass # TODO: Implement Let case
+            assert(isinstance(decl, VarDecl))
+            assert(isinstance(defn, TypedExpr))
+            assert(isinstance(body, TypedExpr))
+            # let x=y in z
+            # App(\\ x. z)(y)
+
+            unsuger_expr: App = (
+                App(TypedExpr(
+                        Lambda( decl,
+                                body,
+                                body.type),
+                        Arrow(decl.type, body.type)),
+                    defn))
+
+            return infer_types(
+                        TypedExpr(
+                            unsuger_expr, body.type
+                        )
+                    )
 
         case Lambda(decl, body, ret):
-            # Type[body]    =   { Type[ret] } v { Type[??? --> Type[ret] }
+            # Type[body]    =   Type[ret]
             # Type[expr]    =   Type[decl] --> Type[ret]
+
+            assert (isinstance(decl, VarDecl))
+            assert (isinstance(body, TypedExpr))
+            assert (isinstance(ret, LambdaType))
+
+
+
+
+
             pass # TODO: Implement Lambda case
 
         case App(func, arg):
-            # Type[func] = Type[arg] --> ???
+            # Type[expr]    =   Type[func] --> Type[arg]
             pass # TODO: Implement App case
 
         # case TypedExpr(te, tt):
