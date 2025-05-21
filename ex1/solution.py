@@ -5,7 +5,7 @@ Your task:
 Implement type checking and type inference for simply-typed lambda calculus.
 """
 
-from syntax.lambda_typed import parse, TypedExpr, is_grounded_expr
+from syntax.lambda_typed import parse, TypedExpr, is_grounded_expr, Id, Expr, LambdaType, VarDecl, App, Lambda, Let
 
 
 class TypeMismatchError(TypeError):
@@ -24,6 +24,40 @@ def infer_types(expr: TypedExpr) -> TypedExpr:
      * If some types cannot be inferred, raise InsufficientAnnotationsError
     """
     assert is_grounded_expr(expr, require_fully_annotated=False)
+
+    # General sketch of the implementation:
+    # Input: AST Expression
+    #
+    # 1. Go on and label vars with general types, collecting them in the process into the environment
+    # 2.
+    #
+
+    match expr:
+        case VarDecl(var, varType):
+            # Type[var]     =   Type[varType]
+            pass # TODO: Implement VarDecl case
+
+        case Let(decl, defn, body):
+            # Type[decl]    =   Type[defn]
+            # Type[expr]    =   Type[body] // TODO: Recheck
+            pass # TODO: Implement Let case
+
+        case Lambda(decl, body, ret):
+            # Type[body]    =   { Type[ret] } v { Type[??? --> Type[ret] }
+            # Type[expr]    =   Type[decl] --> Type[ret]
+            pass # TODO: Implement Lambda case
+
+        case App(func, arg):
+            # Type[func] = Type[arg] --> ???
+            pass # TODO: Implement App case
+
+        # case TypedExpr(te, tt):
+        #     pass # TODO: Implement different matches for `te`
+
+        # TODO: List other matches
+
+        case _:
+            raise TypeError(f"Unknown expression type (unrelated to grounded types): {expr}")
 
     result: TypedExpr = ...
     raise NotImplementedError
