@@ -18,7 +18,7 @@ class InsufficientAnnotationsError(TypeError):
 
 def infer_types(expr: TypedExpr) -> TypedExpr:
     """
-    Input: an expression with ungrounded type variables (t.is_internal()).
+    Input: an expression with ungrounded types (containing TypeVar types).
     Output: An ast with all the types explicitly inferred.
      * If encountered a unification error, raise TypeMismatchError
      * If some types cannot be inferred, raise InsufficientAnnotationsError

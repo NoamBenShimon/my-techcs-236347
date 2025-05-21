@@ -39,7 +39,7 @@ def num(n: int) -> TypedExpr:
 
 
 def boolean(b: bool) -> TypedExpr:
-    return TypedExpr(Bool.TRUE if b else Bool.FALSE, type=None)  # type: ignore[param]
+    return TypedExpr(Bool(b), type=None)  # type: ignore[param]
 
 
 def var(name: str, type: LambdaType = None) -> VarDecl:
@@ -75,9 +75,9 @@ def let(decl: VarDecl, defn: TypedExpr, body: TypedExpr) -> TypedExpr:
         (r"\x y. x", lam(decl("x"), lam(decl("y"), id_("x")))),
         (r"\x. 5", lam(decl("x"), num(5))),
         # Lambda with type
-        (r"\x : int. x", lam(decl("x", Primitive.INT), id_("x"))),
+        (r"\(x : int). x", lam(decl("x", Primitive.INT), id_("x"))),
         (
-            r"\x : int. \y : Bool. x",
+            r"\(x : int). \y : Bool. x",
             lam(decl("x", Primitive.INT), lam(decl("y", tid("Bool")), id_("x"))),
         ),
         (

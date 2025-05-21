@@ -31,7 +31,7 @@ class TypeName:
 @dataclass(frozen=True, slots=True)
 class TypeVar:
     """Represents a placeholder for a yet-unknown type.
-    This is used when parsing an expression without explicit type, and for type inference.
+    This is used when parsing an expression without an explicit type, and for type inference.
     In the former case, it will not be pretty-printed."""
 
     id: int  # if negative, it is an internal type variable, created during parsing and not pretty-printed
@@ -96,9 +96,9 @@ class Int:
     n: int
 
 
-class Bool(enum.Enum):
-    FALSE = "False"
-    TRUE = "True"
+@dataclass(frozen=True, slots=True)
+class Bool:
+    b: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -222,9 +222,9 @@ class NodeFactory(Transformer):
 
     def var(self, token):
         if token.value == "True":
-            return TypedExpr(Bool.TRUE, None)  # type: ignore[param]
+            return TypedExpr(Bool(True), None)  # type: ignore[param]
         if token.value == "False":
-            return TypedExpr(Bool.FALSE, None)  # type: ignore[param]
+            return TypedExpr(Bool(False), None)  # type: ignore[param]
         return TypedExpr(Id(token.value), None)  # type: ignore[param]
 
     def num(self, token):
@@ -251,7 +251,7 @@ _factory = NodeFactory()
 
 def parse(program_text: str) -> TypedExpr:
     """Parses a typed lambda calculus program and returns the corresponding expression.
-    all types are either ground types or fresh type variables for which .is_internal() is True.
+    All types are either ground types or fresh type variables for which .is_internal() is True.
     """
     grammar = _read_grammar("lambda_typed.lark", _factory)
     try:
@@ -306,10 +306,8 @@ def pretty(expr: Expr) -> str:
             return name
         case Int(n):
             return str(n)
-        case Bool.TRUE:
-            return "True"
-        case Bool.FALSE:
-            return "False"
+        case Bool(b):
+            return "True" if b else "False"
         case Let() as let:
             return f"let {pretty_decl(let.decl, omit_parens=True)} = {pretty_typed(let.defn, omit_parens=True)} in {pretty_typed(let.body)}"
         case Lambda(decl, body, ret):
