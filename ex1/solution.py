@@ -276,7 +276,8 @@ def infer_types(expr: TypedExpr) -> TypedExpr:
 
     result: TypedExpr = subst.apply_to_expr(typed_expr)
 
-    assert is_grounded_expr(result, require_fully_annotated=True)
+    if not is_grounded_expr(result, require_fully_annotated=True):
+        raise InsufficientAnnotationsError("Expression has insufficient type annotations")
     return result
 
 
