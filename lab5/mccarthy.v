@@ -1,6 +1,7 @@
 Set Implicit Arguments.
 
 Require Import Arith.
+Require Import Lia.
 Import Nat.
 
 (*
@@ -40,6 +41,15 @@ Check mul_sub_distr_r.
 Lemma preserves s1 s2 : inv s1 -> step s1 s2 -> inv s2.
 Proof.
   intros Before Step.
+  destruct Step.
+  
+  - unfold inv.
+    unfold inv in Before.
+    lia.
+    
+  - unfold inv.
+    unfold inv in Before.
+    lia.
   (* ... *)
 Qed.
 
@@ -60,14 +70,61 @@ End ReflexiveTransitiveClosureDef.
 
 
 Lemma inv_tc s1 s2 : inv s1 -> tc step s1 s2 -> inv s2.
+Proof.
+  intros Before Step.
+  induction Step.
+  - apply Before.
+  - apply IHStep in Before.
+    apply (preserves Before H).
+Qed.
+  
 
 Theorem mccarthy91 n n' : n <= 101 ->
                           tc step (n, 1) (n', 0) ->
                           n' <= 91.
+Proof.
+  intros Before Step.
+  
+  assert (inv_init : inv (n, 1)).
+  {
+    unfold inv.
+    lia.
+  }
+  
+  apply (inv_tc inv_init Step).
+Qed.
+
 
 (*
  * Bonus: prove that n' >= 91 as well.
  *)
+Theorem mccarthy91' n n' : n <= 101 ->
+                          tc step (n, 1) (n', 0) ->
+                          n' >= 91.
+Proof.
+  intros Before Step.
+  
+  inversion Step. subst.
+  
+  - remember (n', 0) as f0 eqn:eq_f0.
+    destruct H0.
+    + assert (ThePairEquality : (n', 0) = (n0 - 10, c - 1)).
+      {
+        rewrite eq_f0.
+        reflexivity.
+      }
+
+      injection ThePairEquality. intros.
+      lia.
+    
+    + assert (c_succ_0 : 0 = S(c)).
+      {
+        injection eq_f0 as eq_n eq_c.
+        lia.
+      }
+      discriminate c_succ_0.
+  
+Qed.
 
 
 (*
