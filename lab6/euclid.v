@@ -63,7 +63,16 @@ Lemma warm_up a0 b0 : hoare (fun s => s a = a0 /\ s b = b0)
   (* Hint 1: use hoare_weaken_l (from hoare.v).
    * Hint 2: you can switch subgoals with <num>: { ... }. 
    *)
-
+Proof.
+  eapply hoare_weaken_l.
+  
+  intros s Hp.
+  destruct Hp as [Hp1 Hp2].
+  
+  2: eapply hoare_assign.
+  simpl.
+  lia.
+Qed.
 
 
 
@@ -80,8 +89,6 @@ Module MainProof.
   (* ----  some free lemmas!  (you don't have to prove them)  ---- *)
   Lemma gt0_le x y : gt01 x y = 0 <-> x <= y.  Admitted.
   Lemma gt1_gt x y : gt01 x y <> 0 <-> x > y.  Admitted.
-  Lemma ne0_eq x y : ne01 x y = 0 <-> x = y.  Admitted.
-  Lemma ne1_ne x y : ne01 x y <> 0 <-> x <> y.  Admitted.
   Lemma div_sub a b z : (z | a) -> (z | b) -> (z | a - b).  Admitted.
   Lemma sub_div1 a b z : a >= b -> (z | a) -> (z | a - b) -> (z | b).  Admitted.
   Lemma sub_div2 a b z : a >= b -> (z | b) -> (z | a - b) -> (z | a).  Admitted.
@@ -105,14 +112,85 @@ Module MainProof.
   Lemma euclid_inv a0 b0 : hoare (fun s => linv a0 b0 s /\ s a <> s b)
                                  c
                                  (linv a0 b0).
-
-
+  Proof.
+    eapply hoare_if.
+    - eapply hoare_weaken_l.
+      intros s Hp.
+      destruct Hp as [[Hp1 Hp2] Hp3].
+      simpl in Hp3. apply gt1_gt in Hp3.
+      2: eapply hoare_assign.
+      simpl.
+      unfold linv.
+      eapply aux1.
+      apply Hp1.
+      
+      apply Hp3.
+    
+    - eapply hoare_weaken_l.
+      intros s Hp.
+      destruct Hp as [[Hp1 Hp2] Hp3].
+      simpl in Hp3.
+      apply gt0_le in Hp3.
+      
+      2: eapply hoare_assign.
+      simpl.
+      unfold linv.
+      eapply aux2.
+      apply Hp1.
+      
+      destruct (le_lt_eq_dec (s a) (s b) Hp3) as [H_lt | H_eq].
+      + apply H_lt.
+      + contradiction.
+Qed.
 
 
   Theorem euclid_post a0 b0 : hoare (fun s => s a = a0 /\ s b = b0)
                                     euclid_cmd
                                     (fun s => forall z, (z | a0) /\ (z | b0) <-> (z | s a)).
-
+  Proof.
+    eapply hoare_weaken.
+    2: eapply hoare_while with (P := linv a0 b0).
+    intros s [Hp1 Hp2].
+    
+    2: simpl.
+    
+    - unfold linv.
+      rewrite Hp1, Hp2.
+      reflexivity.
+      
+    - eapply hoare_weaken_l.
+      2: apply euclid_inv.
+      intros s' [Hp1 Hp2].
+      
+      split.
+      + apply Hp1.
+      + assert (ne_a_b : s' a <> s' b).
+        {
+          unfold ne01 in Hp2.
+          destruct (eq_dec (s' a) (s' b)) in Hp2.
+          - contradiction.
+          - apply n0.
+        }
+        apply ne_a_b.
+   - intros s H.
+     simpl in H.
+     destruct H as [H1 H2].
+     unfold linv in H1.
+     split.
+     + apply H1.
+     + assert (H_neq : s a = s b).
+       {
+         unfold ne01 in H2.
+         destruct (eq_dec (s a) (s b)).
+         - apply e.
+         - lia.
+       }
+       rewrite H_neq in H1.
+       rewrite H_neq.
+       firstorder.
+      
+Qed.
+    
     
 End MainProof.
 
