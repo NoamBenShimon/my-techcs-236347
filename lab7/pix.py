@@ -64,4 +64,11 @@ def pix_color(j: int, r: list[int | Int]) -> Formula:
     """This function receives an index j (int) and the run-lengths r (list of ints and int unknowns),
     and returns a Boolean expression describing the color of pixel j.
     A false value represents a white pixel, a true value represents a black pixel."""
-    raise NotImplementedError
+    if r is None:
+        return BoolVal(False)
+
+    s = prefix_sum(r)
+
+    conds = [i <= j for i in s]
+
+    return xor_all(conds)
