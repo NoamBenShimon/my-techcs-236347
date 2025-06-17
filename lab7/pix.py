@@ -65,7 +65,7 @@ def pix_color(j: int, r: list[int | Int]) -> Formula:
     """This function receives an index j (int) and the run-lengths r (list of ints and int unknowns),
     and returns a Boolean expression describing the color of pixel j.
     A false value represents a white pixel, a true value represents a black pixel."""
-    if r is None:
+    if not r:
         return BoolVal(False)
 
     s = prefix_sum(r)
@@ -74,8 +74,65 @@ def pix_color(j: int, r: list[int | Int]) -> Formula:
 
     return xor_all(conds)
 
-# from z3 import *
-# m = z3.Model()
+from z3 import *
 # print(m.eval(pix_color(9, [1, 3, 2, 6])))
 # print(m.eval(pix_color(5, [1, 3, 2, 6])))
 # print([m.eval(pix_color(i, [1, 3, 2, 6])) for i in range(15)])
+
+def solve_problem():
+
+    def model_to_sol(model: ModelRef) -> list[list[bool]]:
+        sol = [[model.eval(pix_color(j, r)) for j in range(ncols)]
+                for r in rows]
+        return sol
+
+    def draw_model(model: ModelRef) -> None:
+        draw(model_to_sol(model))
+
+    def pretty_solve(*formulas: Formula) -> typing.Optional[ModelRef]:
+        s = Solver()
+        s.add(*formulas)
+        status = s.check()
+        print(status)
+        if status == sat:
+            m = s.model()
+            if m:
+                draw_model(m)
+            return m
+        return None
+
+    formulas = []
+
+    # ==== Lower bound
+    all_runs = rows + cols
+    for r in all_runs:
+        if not r:
+            continue
+
+        # First run can be 0-length, as per instructions
+        if isinstance(r[0], ArithRef):
+            formulas.append(r[0] >= 0)
+
+        # Other white runs must be strictly-positive
+        for i in range(2, len(r), 2):
+            if isinstance(r[i], ArithRef):
+                formulas.append(r[i] > 0)
+
+    # ==== Upper bound
+    for row in rows:
+        if row:
+            formulas.append(sum(row) <= ncols)
+    for col in cols:
+        if col:
+            formulas.append(sum(col) <= nrows)
+
+    # ==== Rows/Columns comparison
+    for i in range(nrows):
+        for j in range(ncols):
+            formulas.append(pix_color(j, rows[i]) == pix_color(i, cols[j]))
+
+    # ==== Solve
+    pretty_solve(*formulas)
+
+if __name__ == "__main__":
+    solve_problem()
