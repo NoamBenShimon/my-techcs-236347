@@ -1,3 +1,4 @@
+from __future__ import annotations
 import typing
 
 from z3 import Int, Xor, BoolVal, Solver, sat, Ast, ModelRef
@@ -72,3 +73,9 @@ def pix_color(j: int, r: list[int | Int]) -> Formula:
     conds = [i <= j for i in s]
 
     return xor_all(conds)
+
+# from z3 import *
+# m = z3.Model()
+# print(m.eval(pix_color(9, [1, 3, 2, 6])))
+# print(m.eval(pix_color(5, [1, 3, 2, 6])))
+# print([m.eval(pix_color(i, [1, 3, 2, 6])) for i in range(15)])
