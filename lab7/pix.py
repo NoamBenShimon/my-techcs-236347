@@ -4,6 +4,8 @@ import typing
 from z3 import Int, Xor, BoolVal, Solver, sat, Ast, ModelRef
 from functools import reduce
 
+from lab7.puzzles import PUZZLES
+
 # fmt: off
                                             #      |   | 1 |   | 1 |   |
 rows = [[Int('r00'), 1, Int('r01'), 1],     #      | 1 | 1 | 1 | 1 | 1 |
@@ -134,5 +136,92 @@ def solve_problem():
     # ==== Solve
     pretty_solve(*formulas)
 
+def solve_puzzle(puzzleIndex: int) -> None:
+
+    def model_to_sol(model: ModelRef) -> list[list[bool]]:
+        sol = [[model.eval(pix_color(j, r)) for j in range(nbcols)]
+               for r in brows]
+        return sol
+
+    def draw_model(model: ModelRef) -> None:
+        draw(model_to_sol(model))
+
+    def pretty_solve(*formulas: Formula) -> typing.Optional[ModelRef]:
+        s = Solver()
+        s.add(*formulas)
+        status = s.check()
+        print(status)
+        if status == sat:
+            m = s.model()
+            if m:
+                draw_model(m)
+            return m
+        return None
+
+    puzzle = PUZZLES[puzzleIndex]
+
+    def generate_unknowns():
+
+        def generate_unknowns_list(vec, pref: str):
+            new_vec = []
+            for i in range(len(vec)):
+                counter = 0
+                new_vec.append([])
+                for elem in vec[i]:
+                    if isinstance(elem, int):
+                        new_vec[i].append(Int(f'{pref}{i}{counter}'))
+                        new_vec[i].append(elem)
+                        counter += 1
+
+            return new_vec
+
+        cols, rows = puzzle
+
+        new_cols = generate_unknowns_list(cols, pref='c')
+        new_rows = generate_unknowns_list(rows, pref='r')
+
+        return [new_cols, new_rows]
+
+    formulas = []
+
+    bcols, brows = generate_unknowns()
+    nbcols = len(bcols)
+    nbrows = len(brows)
+
+    # ==== Lower bound
+    all_runs = brows + bcols
+    for r in all_runs:
+        if not r:
+            continue
+
+        # First run can be 0-length, as per instructions
+        if isinstance(r[0], ArithRef):
+            formulas.append(r[0] >= 0)
+
+        # Other white runs must be strictly-positive
+        for i in range(2, len(r), 2):
+            if isinstance(r[i], ArithRef):
+                formulas.append(r[i] > 0)
+
+    # ==== Upper bound
+    for row in brows:
+        if row:
+            formulas.append(sum(row) <= nbcols)
+    for col in bcols:
+        if col:
+            formulas.append(sum(col) <= nbrows)
+
+    # ==== Rows/Columns comparison
+    for i in range(nbrows):
+        for j in range(nbcols):
+            formulas.append(pix_color(j, brows[i]) == pix_color(i, bcols[j]))
+
+    # ==== Solve
+    pretty_solve(*formulas)
+
+
 if __name__ == "__main__":
     solve_problem()
+
+    for puzz in range(len(PUZZLES)):
+        solve_puzzle(puzz)
