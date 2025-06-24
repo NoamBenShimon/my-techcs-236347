@@ -93,7 +93,7 @@ Proof.
       }
 
       (* Now use transitivity *)
-      apply le_trans with h'.
+      apply Nat.le_trans with h'.
       * exact H_le.
       * exact H_h'_le_y.
 Qed.

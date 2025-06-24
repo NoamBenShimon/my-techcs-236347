@@ -26,8 +26,8 @@ Proof.
     (* We need to show gcd a b z *)
     (* Since a > b, we have a = (a - b) + b *)
     assert (H_eq: a = (a - b) + b).
-    { rewrite add_comm.
-      rewrite <- le_plus_minus.
+    { symmetry.
+      rewrite Nat.sub_add with b a.
       reflexivity.
       apply lt_le_incl.
       exact H_gt. }
@@ -40,7 +40,9 @@ Proof.
     (* We need to show gcd a b z *)
     (* Since a < b, we have b = a + (b - a) *)
     assert (H_eq: b = a + (b - a)).
-    { rewrite <- le_plus_minus.
+    { symmetry.
+      rewrite <- Nat.add_comm.
+      rewrite Nat.sub_add with a b.
       reflexivity.
       apply lt_le_incl.
       exact H_lt. }
