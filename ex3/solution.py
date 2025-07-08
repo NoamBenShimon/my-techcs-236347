@@ -14,7 +14,7 @@ from syntax.while_lang import (
     Seq,
     If,
     While,
-    Stmt,
+    Stmt, pretty,
 )
 
 
@@ -65,11 +65,11 @@ def find_solution(
                 return env[name]
             case Int(value):
                 return z3.IntVal(value)
-            case BinOp(left, op, right):
-                evall = eval_expr(left, env)
-                evalr = eval_expr(right, env)
-                return OP[op](evall, evalr)
-        raise Exception(f"Unexpected expression: {expr}")
+            case BinOp(op, left, right):
+                eval_l = eval_expr(left, env)
+                eval_r = eval_expr(right, env)
+                return OP[op](eval_l, eval_r)
+        raise Exception(f"Unexpected expression: {expr} of type {type(expr)}")
 
     def weakest_precondition(stmt: Stmt, Q: Invariant) -> Invariant:
         match stmt:
@@ -106,11 +106,90 @@ def find_solution(
                 return reQ
 
             case While(cond, body):
-                return linv
+                return linv # Weakest precondition is the loop invariant
 
-        return
+        raise Exception(f"Unexpected statement: {stmt} of type {type(stmt)}")
 
-    return z3.Solver()
+    # Collect all program variables
+    pvars = set()
+
+    def collect_vars_from_expr(expr: Expr) -> None:
+        match expr:
+            case Id(name):
+                pvars.add(name)
+            case Int(_):
+                pass
+            case BinOp(op, left, right):
+                collect_vars_from_expr(left)
+                collect_vars_from_expr(right)
+
+    def collect_vars(stmt: Stmt) -> None:
+        match stmt:
+            case Skip():
+                pass
+            case Assign(var, expr):
+                collect_vars_from_expr(var)
+                collect_vars_from_expr(expr)
+            case Seq(first, second):
+                collect_vars(first)
+                collect_vars(second)
+            case If(cond, then_branch, else_branch):
+                collect_vars_from_expr(cond)
+                collect_vars(then_branch)
+                collect_vars(else_branch)
+            case While(cond, body):
+                collect_vars_from_expr(cond)
+                collect_vars(body)
+    collect_vars(stmt)
+
+    # Create env
+    env = mk_env(pvars)
+
+    constraints = []
+
+    # Precondition `P` implies weakest precondition
+    wp_main = weakest_precondition(stmt, Q)
+    constraint = z3.Implies(P(env), wp_main(env))
+    constraints.append(constraint)
+
+    # constraint for the loop invariant
+    def collect_loop_constraints(stmt: Stmt, Q: Invariant) -> None:
+        match stmt:
+            case While(cond, body):
+                # Body preserves loop invariant ; [ linv /\ cond --> wp(body) ]
+                wp_body = weakest_precondition(body, linv)
+                eval_cond = eval_expr(cond, env)
+                preservation = z3.Implies(
+                    z3.And(linv(env), eval_cond),
+                    wp_body(env)
+                )
+                constraints.append(z3.Not(preservation))
+
+                # End loop case ; [ linv /\ ~cond --> Q ]
+                exit_cond = z3.Implies(
+                    z3.And(linv(env), z3.Not(eval_cond)),
+                    Q(env)
+                )
+                constraints.append(z3.Not(exit_cond))
+
+                # No need to recusively collect, as there is only one loop in the program
+
+            case Seq(first, second):
+                wp_second = weakest_precondition(second, Q)
+                collect_loop_constraints(first, wp_second)
+                collect_loop_constraints(second, Q)
+            case If(_, then_branch, else_branch):
+                collect_loop_constraints(then_branch, Q)
+                collect_loop_constraints(else_branch, Q)
+            case _:
+                pass
+
+    collect_loop_constraints(stmt, Q)
+
+    solver = z3.Solver()
+    solver.add(z3.Or([z3.Not(c) for c in constraints]))
+
+    return solver
 
 
 def verify(P: Invariant, stmt: Stmt, Q: Invariant, linv: Invariant = TRIVIAL) -> bool:
