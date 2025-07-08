@@ -159,17 +159,15 @@ def find_solution(
                 # Body preserves loop invariant ; [ linv /\ cond --> wp(body) ]
                 wp_body = weakest_precondition(body, linv)
                 eval_cond = eval_expr(cond, env)
-                # FIXME: For formal correctness, we should remove P(env)
                 preservation = z3.Implies(
-                    z3.And(P(env), linv(env), eval_cond),
+                    z3.And(linv(env), eval_cond),
                     wp_body(env)
                 )
                 constraints.append(preservation)
 
                 # End loop case ; [ linv /\ ~cond --> Q ]
-                # FIXME: For formal correctness, we should remove P(env)
                 exit_cond = z3.Implies(
-                    z3.And(P(env), linv(env), z3.Not(eval_cond)),
+                    z3.And(linv(env), z3.Not(eval_cond)),
                     Q(env)
                 )
                 constraints.append(exit_cond)
