@@ -79,7 +79,7 @@ def find_solution(
 
                 def reQ(env: Env) -> Formula:
                     evale = eval_expr(expr, env)
-                    new_env = upd(env, var, evale)
+                    new_env = upd(env, var.name, evale)
                     return Q(new_env)
 
                 return reQ
@@ -163,14 +163,14 @@ def find_solution(
                     z3.And(linv(env), eval_cond),
                     wp_body(env)
                 )
-                constraints.append(z3.Not(preservation))
+                constraints.append(preservation)
 
                 # End loop case ; [ linv /\ ~cond --> Q ]
                 exit_cond = z3.Implies(
                     z3.And(linv(env), z3.Not(eval_cond)),
                     Q(env)
                 )
-                constraints.append(z3.Not(exit_cond))
+                constraints.append(exit_cond)
 
                 # No need to recusively collect, as there is only one loop in the program
 
